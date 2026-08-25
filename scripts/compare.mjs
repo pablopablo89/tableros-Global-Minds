@@ -1,0 +1,31 @@
+import fs from 'fs'
+const load = c => JSON.parse(fs.readFileSync(`public/snapshots/${c}.json`,'utf8'))
+const A = load('anahuac_gm'), U = load('uees')
+const seg = (m,id)=>m.segmentos.find(s=>s.id===id)||{}
+const ciu = (m,n)=>(m.ciudades.find(c=>c.ciudad===n)||{}).matriculados
+const tk = (m,t)=>{const x=m.ticket.find(t2=>t2.tipo.toLowerCase().includes(t));return x?Math.round(x.valor):'-'}
+const row=(k,mio,pdf)=>{const p=pdf&&mio?((mio/pdf*100).toFixed(0)+'%'):'';console.log(k.padEnd(26),String(mio).padStart(9),String(pdf).padStart(9),p.padStart(7))}
+console.log('\n===== ANÁHUAC GMP =====   TABLERO      PDF   match')
+row('Leads totales',A.funnel.leadsTotales,29734)
+row('No útiles',A.funnel.noUtiles,6104)
+row('En gestión',A.funnel.enGestion,29389)
+row('Potenciales',A.funnel.potenciales,43)
+row('Matriculados',A.funnel.matriculados,235)
+row('MAS matriculados',seg(A,'mas').matriculados,180)
+row('DIP matriculados',seg(A,'dip').matriculados,55)
+row('MAS potenciales',seg(A,'mas').potenciales,17)
+row('DIP potenciales',seg(A,'dip').potenciales,18)
+row('Ticket Másters',tk(A,'máster'),92533)
+row('Ticket Diplomados',tk(A,'diplom'),33423)
+row('CDMX matriculados',ciu(A,'CDMX'),162)
+console.log('\n===== UEES =====          TABLERO      PDF   match')
+row('Leads totales',U.funnel.leadsTotales,56120)
+row('No útiles',U.funnel.noUtiles,15304)
+row('En gestión',U.funnel.enGestion,48055)
+row('Potenciales',U.funnel.potenciales,26)
+row('Matriculados',U.funnel.matriculados,653)
+row('GMP matriculados',seg(U,'gmp').matriculados,465)
+row('DIP matriculados',seg(U,'dip').matriculados,188)
+row('Ticket GMP',tk(U,'gmp'),2347)
+row('Ticket Diplomados',tk(U,'diplom'),775)
+row('Guayaquil matric.',ciu(U,'Guayaquil'),236)

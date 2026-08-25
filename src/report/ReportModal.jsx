@@ -1,0 +1,49 @@
+import { useState } from 'react'
+import { SECCIONES, generarPptx } from './buildPptx.js'
+
+export default function ReportModal({ data, cfg, onClose }) {
+  const [sel, setSel] = useState(SECCIONES.filter((s) => s.base).map((s) => s.id))
+  const [gen, setGen] = useState(false)
+
+  const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+
+  const descargar = async () => {
+    setGen(true)
+    try {
+      // Respeta el orden canónico de SECCIONES.
+      const orden = SECCIONES.filter((s) => sel.includes(s.id)).map((s) => s.id)
+      await generarPptx(data, cfg, orden)
+      onClose()
+    } catch (e) {
+      alert('No se pudo generar el reporte: ' + e)
+    } finally {
+      setGen(false)
+    }
+  }
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">Generar reporte — {cfg.nombre}</div>
+        <div className="m-b">
+          <p className="small muted" style={{ marginTop: 0 }}>Elegí qué láminas incluir. Las base replican tu presentación actual; las opcionales suman información del tablero.</p>
+          {SECCIONES.map((s) => (
+            <label className="check" key={s.id}>
+              <input type="checkbox" checked={sel.includes(s.id)} onChange={() => toggle(s.id)} />
+              <span>
+                {s.label} {!s.base && <span className="opt-sub">· opcional</span>}
+                {s.sub && <div className="opt-sub">{s.sub}</div>}
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="m-f">
+          <button className="btn" onClick={onClose} disabled={gen}>Cancelar</button>
+          <button className="btn primary" onClick={descargar} disabled={gen || !sel.length}>
+            {gen ? 'Generando…' : 'Descargar .pptx'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
