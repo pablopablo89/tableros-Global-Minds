@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { REQUIRE_PASSWORD, USE_SEED } from '../config.js'
+import { REQUIRE_PASSWORD } from '../config.js'
 
 // Gate de contraseña a nivel app. La clave se guarda en sessionStorage y se
 // reenvía al proxy (/api/nods) como x-app-key. En modo seed no valida contra red;
@@ -44,7 +44,7 @@ export default function Gate({ children }) {
         />
         {err && <div className="err">{err}</div>}
         <button className="btn primary" style={{ width: '100%', justifyContent: 'center' }}>Entrar</button>
-        {USE_SEED && <p className="small faint" style={{ marginTop: 14, marginBottom: 0 }}>Modo demo (datos de ejemplo)</p>}
+        {!esperada && <p className="small faint" style={{ marginTop: 14, marginBottom: 0 }}>Modo demo · sin clave configurada</p>}
       </form>
     </div>
   )

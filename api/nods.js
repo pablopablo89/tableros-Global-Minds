@@ -18,7 +18,8 @@ const RUTA = {
 }
 
 export default async function handler(req, res) {
-  const base = process.env.NODS_API_BASE
+  // URL base de la API de NODS (Railway). No es secreta; la key sí va por env.
+  const base = (process.env.NODS_API_BASE || 'https://apinods-production.up.railway.app').replace(/\/mcp\/?$/, '')
   const appPassword = process.env.APP_PASSWORD
 
   if (appPassword) {
