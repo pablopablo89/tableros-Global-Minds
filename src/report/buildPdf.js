@@ -69,8 +69,12 @@ async function portada(ctx) {
   doc.setFillColor(...INK); doc.rect(0, 0, W, H, 'F')
   const cover = await coverDataUrl(cfg)
   if (cover) {
-    const ih = (W * 810) / 1440 // portada del deck 16:9, ajustada al ancho
-    doc.addImage(cover, 'PNG', 0, (H - ih) / 2, W, ih)
+    // "cover fit": llena toda la hoja sin deformar (recorta el excedente lateral).
+    const imgRatio = 1440 / 810
+    let w, h, x, y
+    if (W / H > imgRatio) { w = W; h = W / imgRatio; x = 0; y = (H - h) / 2 }
+    else { h = H; w = H * imgRatio; y = 0; x = (W - w) / 2 }
+    doc.addImage(cover, 'PNG', x, y, w, h)
     return
   }
   doc.setFillColor(25, 70, 227); doc.rect(0, H / 2 - 2, W / 3, 3, 'F')
