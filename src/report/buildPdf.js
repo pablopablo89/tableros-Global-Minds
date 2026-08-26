@@ -2,7 +2,10 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { n0, pct, money, fecha } from '../lib/format.js'
 import { programasDe, segPrincipal, segDiplomados, consolidarProgramas } from '../lib/derive.js'
-import { coverDataUrl } from './coverImage.js'
+import { coverDataUrl, imgDataUrl } from './coverImage.js'
+
+let HEADER = null // franja de encabezado del deck (gradiente + logo NODS|+a)
+const HEADER_H = (297 * 79) / 1440 // alto del header al ancho A4 (mm)
 
 // Mismo contrato que buildPptx: genera el reporte en PDF con las secciones elegidas.
 // Reutiliza SECCIONES de buildPptx para no duplicar la lista.
@@ -20,6 +23,7 @@ export async function generarPdf(data, cfg, seleccion) {
   const acc = hx(cfg.acento)
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
   const ctx = { doc, acc, cfg, data, primeraLamina: true }
+  HEADER = await imgDataUrl('header.png')
 
   const inc = (id) => seleccion.includes(id)
   if (inc('portada')) await portada(ctx)
@@ -41,6 +45,7 @@ function nuevaLamina(ctx) {
 }
 
 function barraMarca(doc) {
+  if (HEADER) { doc.addImage(HEADER, 'PNG', 0, 0, W, HEADER_H); return }
   doc.setFillColor(25, 70, 227); doc.rect(0, 0, W / 3, 1.6, 'F')
   doc.setFillColor(225, 29, 72); doc.rect(W / 3, 0, W / 3, 1.6, 'F')
   doc.setFillColor(18, 179, 166); doc.rect((2 * W) / 3, 0, W / 3, 1.6, 'F')
@@ -54,8 +59,8 @@ function titulo(ctx, t) {
   const { doc } = ctx
   nuevaLamina(ctx)
   barraMarca(doc)
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...INK)
-  doc.text(t, M, 20)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(19); doc.setTextColor(...INK)
+  doc.text(t, M, 25)
 }
 
 async function portada(ctx) {
@@ -126,7 +131,7 @@ function slidePrograma(ctx, tit, filas) {
   const tot = filas.reduce((a, f) => ({ g: a.g + f.gestionados, nu: a.nu + f.noUtil, p: a.p + f.potenciales, m: a.m + f.matriculados, t: a.t + f.total }), { g: 0, nu: 0, p: 0, m: 0, t: 0 })
   const foot = [[{ content: 'Total', styles: { fontStyle: 'bold', textColor: WHITE, fillColor: INK } }, ...[tot.g, tot.nu, tot.p, tot.m, tot.t].map((v) => ({ content: n0(v), styles: { halign: 'right', fontStyle: 'bold', textColor: WHITE, fillColor: INK } }))]]
   autoTable(doc, {
-    startY: 26, head, body, foot, margin: { left: M, right: M },
+    startY: 30, head, body, foot, margin: { left: M, right: M },
     headStyles: { fillColor: acc, textColor: WHITE, fontSize: 8, halign: 'right' },
     bodyStyles: { fontSize: 7.5 }, footStyles: { fontSize: 8 },
     columnStyles: { 0: { halign: 'left', cellWidth: 130 }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
@@ -140,7 +145,7 @@ function slideCiudad(ctx) {
   titulo(ctx, 'Detalle por ciudad')
   const top = [...(data.ciudades || [])].sort((a, b) => b.matriculados - a.matriculados).slice(0, 22)
   const max = top[0]?.matriculados || 1
-  let y = 32
+  let y = 34
   const bx = 70, bw = 190
   doc.setFontSize(8)
   top.forEach((c) => {
@@ -160,7 +165,7 @@ function slideMotivos(ctx) {
     const filas = [...(data.tipificaciones?.[seg.id] || [])].sort((a, b) => b.leads - a.leads)
     const total = filas.reduce((a, f) => a + f.leads, 0)
     autoTable(doc, {
-      startY: 26, margin: { left: sx }, tableWidth: 130,
+      startY: 30, margin: { left: sx }, tableWidth: 130,
       head: [[`Tipificación · ${seg.nombre}`, 'Leads', '%']],
       headStyles: { fillColor: acc, textColor: WHITE, fontSize: 8 },
       body: filas.map((f) => [f.motivo, n0(f.leads), pct(total ? (f.leads / total) * 100 : 0)]),

@@ -42,9 +42,10 @@ export default function AccountView({ cuenta }) {
           <div className="sub">{cuenta.subtitulo}</div>
         </div>
         <div className="meta">
-          {data && <>Datos al <b>{fecha(data.fechaCorte)}</b><br /></>}
-          {actualizado && <>Actualizado {actualizado.toLocaleTimeString('es-ES')}<br /></>}
-          {modo === 'live' ? <span className="small faint">en vivo · API NODS</span> : <span className="small faint">datos reales · snapshot</span>}
+          {data?.actualizado
+            ? <>Datos actualizados<br /><b>{new Date(data.actualizado).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}</b><br /></>
+            : data && <>Datos al <b>{fecha(data.fechaCorte)}</b><br /></>}
+          <span className="small faint">datos reales · API NODS</span>
           {data?.cobertura && <div className="small faint">{n0(data.cobertura.leads)} leads · {n0(data.cobertura.matriculas)} matrículas</div>}
         </div>
       </div>
@@ -82,7 +83,7 @@ export default function AccountView({ cuenta }) {
 
       {modo !== 'live' && (
         <p className="small faint" style={{ marginTop: -6, marginBottom: 16 }}>
-          Vista de datos reales (snapshot del ciclo). Los filtros de fecha/semana se aplican en modo "en vivo" contra la API.
+          Los datos se actualizan solos cada mañana. El botón "Actualizar" recarga la última versión publicada.
         </p>
       )}
 

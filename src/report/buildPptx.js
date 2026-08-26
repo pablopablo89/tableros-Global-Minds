@@ -2,7 +2,9 @@ import PptxGenJS from 'pptxgenjs'
 import { n0, pct, money } from '../lib/format.js'
 import { programasDe, segPrincipal, segDiplomados, consolidarProgramas } from '../lib/derive.js'
 import { fecha } from '../lib/format.js'
-import { coverDataUrl } from './coverImage.js'
+import { coverDataUrl, imgDataUrl } from './coverImage.js'
+
+let HEADER = null // franja de encabezado del deck (gradiente + logo NODS|+a)
 
 const INK = '0E1116'
 const WHITE = 'FFFFFF'
@@ -28,6 +30,7 @@ export async function generarPptx(data, cfg, seleccion) {
   pptx.layout = 'W'
   pptx.theme = { headFontFace: 'Space Grotesk', bodyFontFace: 'Space Grotesk' }
 
+  HEADER = await imgDataUrl('header.png')
   const inc = (id) => seleccion.includes(id)
 
   if (inc('portada')) await portada(pptx, cfg, data)
@@ -45,15 +48,18 @@ export async function generarPptx(data, cfg, seleccion) {
 }
 
 function barraMarca(slide) {
-  slide.addShape('rect', { x: 0, y: 0, w: 4.44, h: 0.08, fill: { color: '1946E3' } })
-  slide.addShape('rect', { x: 4.44, y: 0, w: 4.45, h: 0.08, fill: { color: 'E11D48' } })
-  slide.addShape('rect', { x: 8.89, y: 0, w: 4.44, h: 0.08, fill: { color: '12B3A6' } })
-  slide.addText([{ text: 'NODS', options: { bold: true } }, { text: '  |  +a', options: { color: MUTED } }],
-    { x: 10.3, y: 0.18, w: 2.8, h: 0.4, align: 'right', fontSize: 14, color: INK })
+  // Franja de encabezado del deck (gradiente + logo NODS|+a real) a todo el ancho.
+  if (HEADER) {
+    slide.addImage({ data: HEADER, x: 0, y: 0, w: 13.333, h: 0.731 })
+  } else {
+    slide.addShape('rect', { x: 0, y: 0, w: 4.44, h: 0.08, fill: { color: '1946E3' } })
+    slide.addShape('rect', { x: 4.44, y: 0, w: 4.45, h: 0.08, fill: { color: 'E11D48' } })
+    slide.addShape('rect', { x: 8.89, y: 0, w: 4.44, h: 0.08, fill: { color: '12B3A6' } })
+  }
 }
 
 function tituloSlide(slide, titulo) {
-  slide.addText(titulo, { x: 0.5, y: 0.5, w: 9, h: 0.6, fontSize: 26, bold: true, color: INK })
+  slide.addText(titulo, { x: 0.5, y: 0.9, w: 11, h: 0.55, fontSize: 24, bold: true, color: INK })
 }
 
 async function portada(pptx, cfg, data) {
@@ -82,7 +88,7 @@ function slideFunnel(pptx, cfg, data, acc) {
     ['Leads totales', f.leadsTotales], ['No útiles', f.noUtiles], ['En gestión', f.enGestion],
     ['Potenciales', f.potenciales], ['Matriculados', f.matriculados],
   ]
-  let y = 1.6
+  let y = 1.75
   const maxW = 5.5
   const max = Math.max(...pasos.map((p) => p[1]), 1)
   pasos.forEach(([lbl, val]) => {
@@ -95,10 +101,10 @@ function slideFunnel(pptx, cfg, data, acc) {
   // Segmentos
   let sx = 9.0
   data.segmentos.forEach((seg) => {
-    s.addText(seg.nombre, { x: sx, y: 1.5, w: 1.9, h: 0.4, align: 'center', fontSize: 14, bold: true, color: WHITE, fill: { color: acc } })
+    s.addText(seg.nombre, { x: sx, y: 1.75, w: 1.9, h: 0.4, align: 'center', fontSize: 14, bold: true, color: WHITE, fill: { color: acc } })
     const rows = [['Leads', n0(seg.leads)], ['Contacto', pct(seg.contactoPct)], ['Potenciales', n0(seg.potenciales)], ['Matriculados', n0(seg.matriculados)]]
     s.addTable(rows.map((r) => [{ text: r[0], options: { color: MUTED } }, { text: r[1], options: { align: 'right', bold: true } }]),
-      { x: sx, y: 1.95, w: 1.9, fontSize: 11, border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.4 })
+      { x: sx, y: 2.2, w: 1.9, fontSize: 11, border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.4 })
     sx += 2.1
   })
   if (f.notas?.length) s.addText(f.notas.join(' · '), { x: 0.6, y: 6.7, w: 8, h: 0.4, fontSize: 11, italic: true, color: MUTED })
@@ -139,7 +145,7 @@ function slidePrograma(pptx, titulo, filas, acc) {
     const s = pptx.addSlide()
     barraMarca(s); tituloSlide(s, titulo + (primera ? '' : ' (cont.)'))
     s.addTable(tablaPrograma(bloque, acc), {
-      x: 0.5, y: 1.5, w: 12.3, colW: [6.3, 1.3, 1.1, 1.3, 1.4, 0.9],
+      x: 0.5, y: 1.65, w: 12.3, colW: [6.3, 1.3, 1.1, 1.3, 1.4, 0.9],
       border: { type: 'solid', color: LINE, pt: 0.5 }, valign: 'middle', autoPage: false,
     })
     primera = false
@@ -158,7 +164,7 @@ function slideCiudad(pptx, cfg, data, acc) {
     if (!lista.length) return
     const head = [{ text: 'Ciudad', options: { fill: { color: acc }, color: WHITE, bold: true, fontSize: 10 } }, { text: 'Matriculados', options: { fill: { color: acc }, color: WHITE, bold: true, align: 'right', fontSize: 10 } }]
     const rows = lista.map((c) => [{ text: c.ciudad, options: { fontSize: 9 } }, { text: n0(c.matriculados), options: { align: 'right', bold: true, fontSize: 9 } }])
-    s.addTable([head, ...rows], { x, y: 1.4, w: 6.0, colW: [4.6, 1.4], border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.26, valign: 'middle' })
+    s.addTable([head, ...rows], { x, y: 1.65, w: 6.0, colW: [4.6, 1.4], border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.26, valign: 'middle' })
     x += 6.4
   })
 }
@@ -173,7 +179,7 @@ function slideMotivos(pptx, cfg, data, acc) {
     const head = [{ text: `Tipificación · ${seg.nombre}`, options: { fill: { color: acc }, color: WHITE, bold: true, fontSize: 9 } }, { text: 'Leads', options: { fill: { color: acc }, color: WHITE, bold: true, align: 'right', fontSize: 9 } }, { text: '%', options: { fill: { color: acc }, color: WHITE, bold: true, align: 'right', fontSize: 9 } }]
     const rows = filas.map((f) => [{ text: f.motivo, options: { fontSize: 8 } }, { text: n0(f.leads), options: { align: 'right', fontSize: 8 } }, { text: pct(total ? (f.leads / total) * 100 : 0), options: { align: 'right', fontSize: 8 } }])
     rows.push([{ text: 'Total', options: { bold: true, color: WHITE, fill: { color: INK }, fontSize: 8 } }, { text: n0(total), options: { align: 'right', bold: true, color: WHITE, fill: { color: INK }, fontSize: 8 } }, { text: '100,00%', options: { align: 'right', bold: true, color: WHITE, fill: { color: INK }, fontSize: 8 } }])
-    s.addTable([head, ...rows], { x, y: 1.4, w: 6.1, colW: [4.1, 1, 1], border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.26 })
+    s.addTable([head, ...rows], { x, y: 1.6, w: 6.1, colW: [4.1, 1, 1], border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.24 })
     x += 6.4
   })
   // Ticket

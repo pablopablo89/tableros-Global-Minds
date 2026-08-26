@@ -1,7 +1,11 @@
 // Carga la portada del deck (public/covers/<cuenta>.png) como data URL.
-// Funciona en navegador (fetch) y en Node/tests (lectura de archivo).
 export async function coverDataUrl(cfg) {
-  const file = `${cfg.id}.png`
+  return imgDataUrl(`${cfg.id}.png`)
+}
+
+// Carga cualquier imagen de public/covers/<file> como data URL.
+// Funciona en navegador (fetch) y en Node/tests (lectura de archivo).
+export async function imgDataUrl(file) {
   if (typeof fetch !== 'undefined' && typeof document !== 'undefined') {
     try {
       const r = await fetch(`/covers/${file}`)

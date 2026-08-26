@@ -9,9 +9,9 @@ export default function PlusaLogo({ height = 26 }) {
         <rect x="11" y="1.5" width="7" height="27" rx="1.6" />
       </g>
       {/* letra a */}
-      <text x="33" y="27" fontFamily="'Space Grotesk', system-ui, sans-serif" fontWeight="700" fontSize="32" fill="#12B3A6">a</text>
+      <text x="33" y="27" fontFamily="'Space Grotesk', system-ui, sans-serif" fontWeight="700" fontSize="32" fill="#17A9A2">a</text>
       {/* wordmark */}
-      <text x="2" y="37.5" fontFamily="'Space Grotesk', system-ui, sans-serif" fontWeight="500" fontSize="6.4" letterSpacing="2.6" fill="#5B6472">EDUCAÇÃO</text>
+      <text x="2" y="37.5" fontFamily="'Space Grotesk', system-ui, sans-serif" fontWeight="600" fontSize="6.2" letterSpacing="2.8" fill="#2E2E33">EDUCAÇÃO</text>
     </svg>
   )
 }
