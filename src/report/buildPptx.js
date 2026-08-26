@@ -1,7 +1,8 @@
 import PptxGenJS from 'pptxgenjs'
 import { n0, pct, money } from '../lib/format.js'
-import { programasDe, segPrincipal, segDiplomados, agruparPorCohorte } from '../lib/derive.js'
+import { programasDe, segPrincipal, segDiplomados, consolidarProgramas } from '../lib/derive.js'
 import { fecha } from '../lib/format.js'
+import { coverDataUrl } from './coverImage.js'
 
 const INK = '0E1116'
 const WHITE = 'FFFFFF'
@@ -13,7 +14,7 @@ export const SECCIONES = [
   { id: 'portada', label: 'Portada', sub: 'NODS | +a + nombre de cuenta', base: true },
   { id: 'funnel', label: 'Funnel de conversión', sub: 'Embudo + segmentos', base: true },
   { id: 'prog_principal', label: 'Detalle por programa — Másters/GMP', base: true },
-  { id: 'prog_diplomados', label: 'Detalle por programa — Diplomados', sub: 'Agrupa por cohorte si está disponible', base: true },
+  { id: 'prog_diplomados', label: 'Detalle por programa — Diplomados', sub: 'Consolidado (todas las cohortes juntas)', base: true },
   { id: 'ciudad', label: 'Detalle por ciudad', base: true },
   { id: 'motivos', label: 'Motivos de no compra + ticket', base: true },
   // Opcionales (no venían en el PDF original):
@@ -29,10 +30,11 @@ export async function generarPptx(data, cfg, seleccion) {
 
   const inc = (id) => seleccion.includes(id)
 
-  if (inc('portada')) portada(pptx, cfg, data)
+  if (inc('portada')) await portada(pptx, cfg, data)
   if (inc('funnel')) slideFunnel(pptx, cfg, data, acc)
-  if (inc('prog_principal')) slidePrograma(pptx, `Detalle por programa — ${segPrincipal(cfg).nombre}`, programasDe(data, segPrincipal(cfg).id), acc, false)
-  if (inc('prog_diplomados')) slidePrograma(pptx, 'Detalle por programa — Diplomados', programasDe(data, segDiplomados(cfg).id), acc, true)
+  // Programas CONSOLIDADOS (una fila por programa, sumando todas las cohortes/bases).
+  if (inc('prog_principal')) slidePrograma(pptx, `Detalle por programa — ${segPrincipal(cfg).nombre}`, consolidarProgramas(programasDe(data, segPrincipal(cfg).id)), acc)
+  if (inc('prog_diplomados')) slidePrograma(pptx, 'Detalle por programa — Diplomados', consolidarProgramas(programasDe(data, segDiplomados(cfg).id)), acc)
   if (inc('ciudad')) slideCiudad(pptx, cfg, data, acc)
   if (inc('motivos')) slideMotivos(pptx, cfg, data, acc)
   if (inc('objetivos')) slideObjetivos(pptx, cfg, data, acc)
@@ -54,16 +56,22 @@ function tituloSlide(slide, titulo) {
   slide.addText(titulo, { x: 0.5, y: 0.5, w: 9, h: 0.6, fontSize: 26, bold: true, color: INK })
 }
 
-function portada(pptx, cfg, data) {
+async function portada(pptx, cfg, data) {
   const s = pptx.addSlide()
   s.background = { color: INK }
-  s.addShape('rect', { x: 0, y: 3.2, w: 4.44, h: 0.12, fill: { color: '1946E3' } })
-  s.addShape('rect', { x: 4.44, y: 3.2, w: 4.45, h: 0.12, fill: { color: 'E11D48' } })
-  s.addShape('rect', { x: 8.89, y: 3.2, w: 4.44, h: 0.12, fill: { color: '12B3A6' } })
-  s.addText([{ text: 'NODS', options: { bold: true, fontSize: 40 } }, { text: '   |   +a educação', options: { fontSize: 22, color: 'C9CED8' } }],
-    { x: 0.5, y: 2.2, w: 12.3, h: 0.9, align: 'center', color: WHITE })
-  s.addText(cfg.subtitulo, { x: 0.5, y: 3.5, w: 12.3, h: 0.7, align: 'center', fontSize: 26, color: WHITE, bold: true })
-  s.addText(`Reporte al ${fecha(data.fechaCorte)}`, { x: 0.5, y: 4.2, w: 12.3, h: 0.5, align: 'center', fontSize: 14, color: 'C9CED8' })
+  const cover = await coverDataUrl(cfg)
+  if (cover) {
+    // portada del deck (gradiente + logos NODS|+a + nombre) a pantalla completa
+    s.addImage({ data: cover, x: 0, y: 0, w: 13.333, h: 7.5 })
+  } else {
+    s.addShape('rect', { x: 0, y: 3.2, w: 4.44, h: 0.12, fill: { color: '1946E3' } })
+    s.addShape('rect', { x: 4.44, y: 3.2, w: 4.45, h: 0.12, fill: { color: 'E11D48' } })
+    s.addShape('rect', { x: 8.89, y: 3.2, w: 4.44, h: 0.12, fill: { color: '12B3A6' } })
+    s.addText([{ text: 'NODS', options: { bold: true, fontSize: 40 } }, { text: '   |   +a educação', options: { fontSize: 22, color: 'C9CED8' } }],
+      { x: 0.5, y: 2.2, w: 12.3, h: 0.9, align: 'center', color: WHITE })
+    s.addText(cfg.subtitulo, { x: 0.5, y: 3.5, w: 12.3, h: 0.7, align: 'center', fontSize: 26, color: WHITE, bold: true })
+    s.addText(`Reporte al ${fecha(data.fechaCorte)}`, { x: 0.5, y: 4.2, w: 12.3, h: 0.5, align: 'center', fontSize: 14, color: 'C9CED8' })
+  }
 }
 
 function slideFunnel(pptx, cfg, data, acc) {
@@ -114,48 +122,44 @@ function filaP(f) {
   ]
 }
 
-function slidePrograma(pptx, titulo, filas, acc, agrupar) {
-  // Si son muchas filas (diplomados UEES), parte en varias slides.
-  const grupos = agrupar ? agruparPorCohorte(filas) : [{ cohorte: null, filas }]
-  let bloque = []
-  const MAX = 20
-  const flush = (cont) => {
+function slidePrograma(pptx, titulo, filas, acc) {
+  // Tabla consolidada (una fila por programa), paginada si hace falta.
+  const ordenadas = [...filas].sort((a, b) => b.matriculados - a.matriculados)
+  const tot = filas.reduce((a, f) => ({ g: a.g + f.gestionados, nu: a.nu + f.noUtil, p: a.p + f.potenciales, m: a.m + f.matriculados, t: a.t + f.total }), { g: 0, nu: 0, p: 0, m: 0, t: 0 })
+  const totalRow = [
+    { text: 'Total', options: { align: 'left', bold: true, color: WHITE, fill: { color: INK }, fontSize: 9 } },
+    ...[tot.g, tot.nu, tot.p, tot.m, tot.t].map((v) => ({ text: n0(v), options: { align: 'right', bold: true, color: WHITE, fill: { color: INK }, fontSize: 9 } })),
+  ]
+  const MAX = 22
+  let idx = 0, primera = true
+  do {
+    const bloque = ordenadas.slice(idx, idx + MAX).map(filaP)
+    idx += MAX
+    if (idx >= ordenadas.length) bloque.push(totalRow)
     const s = pptx.addSlide()
-    barraMarca(s); tituloSlide(s, titulo + (cont ? ' (cont.)' : ''))
+    barraMarca(s); tituloSlide(s, titulo + (primera ? '' : ' (cont.)'))
     s.addTable(tablaPrograma(bloque, acc), {
       x: 0.5, y: 1.5, w: 12.3, colW: [6.3, 1.3, 1.1, 1.3, 1.4, 0.9],
       border: { type: 'solid', color: LINE, pt: 0.5 }, valign: 'middle', autoPage: false,
     })
-    bloque = []
-  }
-  let primera = true
-  for (const g of grupos) {
-    const ordenadas = [...g.filas].sort((a, b) => b.matriculados - a.matriculados)
-    if (agrupar && g.cohorte) {
-      if (bloque.length > MAX) { flush(!primera); primera = false }
-      bloque.push([{ text: g.cohorte, options: { colspan: 6, fill: { color: 'F1E6F3' }, color: acc, bold: true, fontSize: 9 } }])
-    }
-    for (const f of ordenadas) {
-      if (bloque.length >= MAX) { flush(!primera); primera = false }
-      bloque.push(filaP(f))
-    }
-  }
-  // Total general
-  const tot = filas.reduce((a, f) => ({ g: a.g + f.gestionados, nu: a.nu + f.noUtil, p: a.p + f.potenciales, m: a.m + f.matriculados, t: a.t + f.total }), { g: 0, nu: 0, p: 0, m: 0, t: 0 })
-  bloque.push([
-    { text: 'Total', options: { align: 'left', bold: true, color: WHITE, fill: { color: INK }, fontSize: 9 } },
-    ...[tot.g, tot.nu, tot.p, tot.m, tot.t].map((v) => ({ text: n0(v), options: { align: 'right', bold: true, color: WHITE, fill: { color: INK }, fontSize: 9 } })),
-  ])
-  flush(!primera)
+    primera = false
+  } while (idx < ordenadas.length)
 }
 
 function slideCiudad(pptx, cfg, data, acc) {
   const s = pptx.addSlide()
   barraMarca(s); tituloSlide(s, 'Detalle por ciudad')
-  const top = [...(data.ciudades || [])].sort((a, b) => b.matriculados - a.matriculados).slice(0, 20)
-  s.addChart(pptx.ChartType.bar, [{ name: 'Matriculados', labels: top.map((c) => c.ciudad), values: top.map((c) => c.matriculados) }], {
-    x: 0.5, y: 1.4, w: 12.3, h: 5.6, barDir: 'col', chartColors: [acc], showValue: true,
-    dataLabelFontSize: 8, catAxisLabelFontSize: 8, valAxisHidden: true, showLegend: false,
+  const top = [...(data.ciudades || [])].sort((a, b) => b.matriculados - a.matriculados).slice(0, 44)
+  // dos tablas lado a lado: Ciudad | Matriculados (así se ven nombre y número)
+  const mitad = Math.ceil(top.length / 2)
+  const cols = [top.slice(0, mitad), top.slice(mitad)]
+  let x = 0.5
+  cols.forEach((lista) => {
+    if (!lista.length) return
+    const head = [{ text: 'Ciudad', options: { fill: { color: acc }, color: WHITE, bold: true, fontSize: 10 } }, { text: 'Matriculados', options: { fill: { color: acc }, color: WHITE, bold: true, align: 'right', fontSize: 10 } }]
+    const rows = lista.map((c) => [{ text: c.ciudad, options: { fontSize: 9 } }, { text: n0(c.matriculados), options: { align: 'right', bold: true, fontSize: 9 } }])
+    s.addTable([head, ...rows], { x, y: 1.4, w: 6.0, colW: [4.6, 1.4], border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.26, valign: 'middle' })
+    x += 6.4
   })
 }
 

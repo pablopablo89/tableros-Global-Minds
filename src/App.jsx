@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Gate from './auth/Gate.jsx'
 import { CUENTAS } from './config.js'
 import AccountView from './components/AccountView.jsx'
+import PlusaLogo from './components/PlusaLogo.jsx'
 
 export default function App() {
   const [activa, setActiva] = useState(CUENTAS[0].id)
@@ -19,7 +20,7 @@ export default function App() {
             <div className="brand">
               <img src="/nods-logo.png" alt="NODS" />
               <span className="div" />
-              <span className="plusa">+a<small>EDUCAÇÃO</small></span>
+              <PlusaLogo height={26} />
             </div>
             <nav className="tabs">
               {CUENTAS.map((c) => (

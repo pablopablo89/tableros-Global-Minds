@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { n0, pct, money, fecha } from '../lib/format.js'
-import { programasDe, segPrincipal, segDiplomados, agruparPorCohorte } from '../lib/derive.js'
+import { programasDe, segPrincipal, segDiplomados, consolidarProgramas } from '../lib/derive.js'
+import { coverDataUrl } from './coverImage.js'
 
 // Mismo contrato que buildPptx: genera el reporte en PDF con las secciones elegidas.
 // Reutiliza SECCIONES de buildPptx para no duplicar la lista.
@@ -21,10 +22,10 @@ export async function generarPdf(data, cfg, seleccion) {
   const ctx = { doc, acc, cfg, data, primeraLamina: true }
 
   const inc = (id) => seleccion.includes(id)
-  if (inc('portada')) portada(ctx)
+  if (inc('portada')) await portada(ctx)
   if (inc('funnel')) slideFunnel(ctx)
-  if (inc('prog_principal')) slidePrograma(ctx, `Detalle por programa — ${segPrincipal(cfg).nombre}`, programasDe(data, segPrincipal(cfg).id), false)
-  if (inc('prog_diplomados')) slidePrograma(ctx, 'Detalle por programa — Diplomados', programasDe(data, segDiplomados(cfg).id), true)
+  if (inc('prog_principal')) slidePrograma(ctx, `Detalle por programa — ${segPrincipal(cfg).nombre}`, consolidarProgramas(programasDe(data, segPrincipal(cfg).id)))
+  if (inc('prog_diplomados')) slidePrograma(ctx, 'Detalle por programa — Diplomados', consolidarProgramas(programasDe(data, segDiplomados(cfg).id)))
   if (inc('ciudad')) slideCiudad(ctx)
   if (inc('motivos')) slideMotivos(ctx)
   if (inc('objetivos')) slideObjetivos(ctx)
@@ -57,10 +58,16 @@ function titulo(ctx, t) {
   doc.text(t, M, 20)
 }
 
-function portada(ctx) {
+async function portada(ctx) {
   const { doc, cfg, data } = ctx
   nuevaLamina(ctx)
   doc.setFillColor(...INK); doc.rect(0, 0, W, H, 'F')
+  const cover = await coverDataUrl(cfg)
+  if (cover) {
+    const ih = (W * 810) / 1440 // portada del deck 16:9, ajustada al ancho
+    doc.addImage(cover, 'PNG', 0, (H - ih) / 2, W, ih)
+    return
+  }
   doc.setFillColor(25, 70, 227); doc.rect(0, H / 2 - 2, W / 3, 3, 'F')
   doc.setFillColor(225, 29, 72); doc.rect(W / 3, H / 2 - 2, W / 3, 3, 'F')
   doc.setFillColor(18, 179, 166); doc.rect((2 * W) / 3, H / 2 - 2, W / 3, 3, 'F')
@@ -110,19 +117,12 @@ function filasPrograma(filas) {
   return filas.map((f) => [f.nombre, n0(f.gestionados), n0(f.noUtil), n0(f.potenciales), n0(f.matriculados), n0(f.total)])
 }
 
-function slidePrograma(ctx, tit, filas, agrupar) {
+function slidePrograma(ctx, tit, filas) {
   const { doc, acc } = ctx
   titulo(ctx, tit)
   const head = [['Programa', 'Gestionados', 'No útil', 'Potenciales', 'Matriculados', 'Total']]
-  let body = []
-  if (agrupar) {
-    for (const g of agruparPorCohorte(filas)) {
-      if (g.cohorte) body.push([{ content: g.cohorte, colSpan: 6, styles: { fillColor: hx(ctx.cfg.acentoSuave), textColor: acc, fontStyle: 'bold', fontSize: 8 } }])
-      body = body.concat(filasPrograma([...g.filas].sort((a, b) => b.matriculados - a.matriculados)))
-    }
-  } else {
-    body = filasPrograma([...filas].sort((a, b) => b.matriculados - a.matriculados))
-  }
+  // Consolidado: una fila por programa (autoTable pagina solo si hace falta).
+  const body = filasPrograma([...filas].sort((a, b) => b.matriculados - a.matriculados))
   const tot = filas.reduce((a, f) => ({ g: a.g + f.gestionados, nu: a.nu + f.noUtil, p: a.p + f.potenciales, m: a.m + f.matriculados, t: a.t + f.total }), { g: 0, nu: 0, p: 0, m: 0, t: 0 })
   const foot = [[{ content: 'Total', styles: { fontStyle: 'bold', textColor: WHITE, fillColor: INK } }, ...[tot.g, tot.nu, tot.p, tot.m, tot.t].map((v) => ({ content: n0(v), styles: { halign: 'right', fontStyle: 'bold', textColor: WHITE, fillColor: INK } }))]]
   autoTable(doc, {

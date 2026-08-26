@@ -54,6 +54,23 @@ export function pasosFunnel(f) {
 
 function pct(a, b) { return b ? (a / b) * 100 : 0 }
 
+// Consolida filas de programa por NOMBRE (suma todas las cohortes/bases).
+// Para el reporte: una fila por programa, no base por base.
+export function consolidarProgramas(filas) {
+  const key = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+  const mapa = new Map()
+  for (const f of filas) {
+    const k = key(f.nombre)
+    if (!mapa.has(k)) mapa.set(k, { ...f, cohorte: null })
+    else {
+      const a = mapa.get(k)
+      a.gestionados += f.gestionados; a.noUtil += f.noUtil
+      a.potenciales += f.potenciales; a.matriculados += f.matriculados; a.total += f.total
+    }
+  }
+  return [...mapa.values()].sort((a, b) => b.matriculados - a.matriculados)
+}
+
 export function cohortesDisponibles(data) {
   const set = new Set()
   for (const p of data.programas || []) if (p.cohorte) set.add(p.cohorte)
