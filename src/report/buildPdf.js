@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { n0, pct, money, fecha } from '../lib/format.js'
-import { programasDe, segPrincipal, segDiplomados, consolidarProgramas } from '../lib/derive.js'
+import { programasDe, segPrincipal, segDiplomados, consolidarProgramas, pasosFunnel } from '../lib/derive.js'
 import { coverDataUrl, imgDataUrl } from './coverImage.js'
 
 let HEADER = null // franja de encabezado del deck (gradiente + logo NODS|+a)
@@ -56,11 +56,12 @@ function barraMarca(doc) {
 }
 
 function titulo(ctx, t) {
-  const { doc } = ctx
+  const { doc, acc } = ctx
   nuevaLamina(ctx)
   barraMarca(doc)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(19); doc.setTextColor(...INK)
   doc.text(t, M, 25)
+  doc.setFillColor(...acc); doc.rect(M, 28.5, 22, 1.4, 'F') // subrayado acento
 }
 
 async function portada(ctx) {
@@ -93,19 +94,24 @@ async function portada(ctx) {
 function slideFunnel(ctx) {
   const { doc, cfg, data, acc } = ctx
   titulo(ctx, 'Funnel de conversión')
-  const f = data.funnel
-  const pasos = [['Leads totales', f.leadsTotales], ['No útiles', f.noUtiles], ['En gestión', f.enGestion], ['Potenciales', f.potenciales], ['Matriculados', f.matriculados]]
-  const max = Math.max(...pasos.map((p) => p[1]), 1)
-  let y = 34
-  const maxW = 130, x0 = M
-  pasos.forEach(([lbl, val]) => {
-    const w = 40 + maxW * (val / max)
-    doc.setFillColor(...acc); doc.roundedRect(x0 + (maxW + 40 - w) / 2, y, w, 13, 1.5, 1.5, 'F')
-    doc.setTextColor(...WHITE); doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
-    doc.text(lbl, x0 + (maxW + 40 - w) / 2 + 4, y + 8)
+  const pasos = pasosFunnel(data.funnel) // {label, val, conv, base}
+  const areaX = M, areaW = 172, cx = areaX + areaW / 2
+  const max = Math.max(...pasos.map((p) => p.val), 1)
+  const bw = (v) => (0.34 + 0.66 * (v / max)) * areaW
+  const bandH = 13, gap = 10
+  let y = 36
+  pasos.forEach((p) => {
+    const w = bw(p.val), x = cx - w / 2
+    doc.setFillColor(...acc); doc.roundedRect(x, y, w, bandH, 2, 2, 'F')
+    doc.setTextColor(...WHITE); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5)
+    doc.text(p.label.toUpperCase(), x + 4, y + bandH / 2 + 2.4)
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12)
-    doc.text(n0(val), x0 + (maxW + 40 - w) / 2 + w - 4, y + 8.5, { align: 'right' })
-    y += 17
+    doc.text(n0(p.val), x + w - 4, y + bandH / 2 + 3, { align: 'right' })
+    if (p.conv != null) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...MUTED)
+      doc.text(`↓  ${pct(p.conv)} ${p.base}`, cx, y + bandH + gap / 2 + 1.5, { align: 'center' })
+    }
+    y += bandH + gap
   })
   // Segmentos (mini tablas)
   let sx = 190
@@ -119,7 +125,8 @@ function slideFunnel(ctx) {
     })
     sx += 52
   })
-  if (f.notas?.length) { doc.setFontSize(8); doc.setTextColor(...MUTED); doc.text(f.notas.join(' · '), M, H - 10) }
+  const notas = data.funnel.notas
+  if (notas?.length) { doc.setFontSize(8); doc.setTextColor(...MUTED); doc.text(notas.join(' · '), M, H - 10) }
 }
 
 function filasPrograma(filas) {
@@ -137,7 +144,7 @@ function slidePrograma(ctx, tit, filas) {
   autoTable(doc, {
     startY: 30, head, body, foot, margin: { left: M, right: M },
     headStyles: { fillColor: acc, textColor: WHITE, fontSize: 8, halign: 'right' },
-    bodyStyles: { fontSize: 7.5 }, footStyles: { fontSize: 8 },
+    bodyStyles: { fontSize: 7.5 }, footStyles: { fontSize: 8 }, alternateRowStyles: { fillColor: [247, 248, 251] },
     columnStyles: { 0: { halign: 'left', cellWidth: 130 }, 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
     styles: { lineColor: LINE, lineWidth: 0.2, overflow: 'linebreak' },
     didParseCell: (d) => { if (d.section === 'head' && d.column.index === 0) d.cell.styles.halign = 'left' },
@@ -174,7 +181,7 @@ function slideMotivos(ctx) {
       headStyles: { fillColor: acc, textColor: WHITE, fontSize: 8 },
       body: filas.map((f) => [f.motivo, n0(f.leads), pct(total ? (f.leads / total) * 100 : 0)]),
       foot: [[{ content: 'Total', styles: { fontStyle: 'bold', textColor: WHITE, fillColor: INK } }, { content: n0(total), styles: { halign: 'right', fontStyle: 'bold', textColor: WHITE, fillColor: INK } }, { content: '100%', styles: { halign: 'right', fontStyle: 'bold', textColor: WHITE, fillColor: INK } }]],
-      bodyStyles: { fontSize: 7 }, columnStyles: { 0: { cellWidth: 95 }, 1: { halign: 'right' }, 2: { halign: 'right' } },
+      bodyStyles: { fontSize: 7 }, alternateRowStyles: { fillColor: [247, 248, 251] }, columnStyles: { 0: { cellWidth: 95 }, 1: { halign: 'right' }, 2: { halign: 'right' } },
       styles: { lineColor: LINE, lineWidth: 0.2 },
     })
     sx += 138

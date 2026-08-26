@@ -1,15 +1,17 @@
 import PptxGenJS from 'pptxgenjs'
 import { n0, pct, money } from '../lib/format.js'
-import { programasDe, segPrincipal, segDiplomados, consolidarProgramas } from '../lib/derive.js'
+import { programasDe, segPrincipal, segDiplomados, consolidarProgramas, pasosFunnel } from '../lib/derive.js'
 import { fecha } from '../lib/format.js'
 import { coverDataUrl, imgDataUrl } from './coverImage.js'
 
 let HEADER = null // franja de encabezado del deck (gradiente + logo NODS|+a)
+let ACC = '0E1116' // acento de la cuenta (se setea en generarPptx)
 
 const INK = '0E1116'
 const WHITE = 'FFFFFF'
 const MUTED = '5B6472'
 const LINE = 'E7EAF0'
+const ZEBRA = 'F7F8FB'
 
 // Secciones disponibles para el reporte (el usuario elige cuáles incluir).
 export const SECCIONES = [
@@ -31,6 +33,7 @@ export async function generarPptx(data, cfg, seleccion) {
   pptx.theme = { headFontFace: 'Space Grotesk', bodyFontFace: 'Space Grotesk' }
 
   HEADER = await imgDataUrl('header.png')
+  ACC = acc
   const inc = (id) => seleccion.includes(id)
 
   if (inc('portada')) await portada(pptx, cfg, data)
@@ -60,6 +63,7 @@ function barraMarca(slide) {
 
 function tituloSlide(slide, titulo) {
   slide.addText(titulo, { x: 0.5, y: 0.9, w: 11, h: 0.55, fontSize: 24, bold: true, color: INK })
+  slide.addShape('rect', { x: 0.52, y: 1.52, w: 0.85, h: 0.055, fill: { color: ACC } })
 }
 
 async function portada(pptx, cfg, data) {
@@ -83,29 +87,30 @@ async function portada(pptx, cfg, data) {
 function slideFunnel(pptx, cfg, data, acc) {
   const s = pptx.addSlide()
   barraMarca(s); tituloSlide(s, 'Funnel de conversión')
-  const f = data.funnel
-  const pasos = [
-    ['Leads totales', f.leadsTotales], ['No útiles', f.noUtiles], ['En gestión', f.enGestion],
-    ['Potenciales', f.potenciales], ['Matriculados', f.matriculados],
-  ]
-  let y = 1.75
-  const maxW = 5.5
-  const max = Math.max(...pasos.map((p) => p[1]), 1)
-  pasos.forEach(([lbl, val]) => {
-    const w = 2 + maxW * (val / max)
-    s.addShape('roundRect', { x: 0.6 + (maxW + 2 - w) / 2, y, w, h: 0.72, rectRadius: 0.06, fill: { color: acc } })
-    s.addText([{ text: lbl + '  ', options: { fontSize: 10, color: 'FFFFFF', transparency: 20 } }, { text: n0(val), options: { fontSize: 15, bold: true } }],
-      { x: 0.6 + (maxW + 2 - w) / 2, y, w, h: 0.72, align: 'center', color: WHITE })
-    y += 0.92
+  const pasos = pasosFunnel(data.funnel) // {label, val, conv, base, w}
+  const areaX = 0.6, areaW = 7.4, cx = areaX + areaW / 2
+  const max = Math.max(...pasos.map((p) => p.val), 1)
+  const bandH = 0.6, gap = 0.42
+  const bw = (v) => (0.34 + 0.66 * (v / max)) * areaW
+  let y = 1.8
+  pasos.forEach((p) => {
+    const w = bw(p.val), x = cx - w / 2
+    s.addShape('roundRect', { x, y, w, h: bandH, rectRadius: 0.05, fill: { color: acc } })
+    s.addText(p.label.toUpperCase(), { x: x + 0.14, y, w: w - 0.28, h: bandH, align: 'left', valign: 'middle', fontSize: 8.5, color: 'FFFFFF' })
+    s.addText(n0(p.val), { x: x + 0.14, y, w: w - 0.28, h: bandH, align: 'right', valign: 'middle', fontSize: 14, bold: true, color: 'FFFFFF' })
+    if (p.conv != null) s.addText(`↓  ${pct(p.conv)} ${p.base}`, { x: areaX, y: y + bandH - 0.02, w: areaW, h: gap, align: 'center', valign: 'middle', fontSize: 9, color: MUTED })
+    y += bandH + gap
   })
-  // Segmentos
-  let sx = 9.0
+  // Segmentos (tarjetas)
+  let sx = 8.9
   data.segmentos.forEach((seg) => {
-    s.addText(seg.nombre, { x: sx, y: 1.75, w: 1.9, h: 0.4, align: 'center', fontSize: 14, bold: true, color: WHITE, fill: { color: acc } })
-    const rows = [['Leads', n0(seg.leads)], ['Contacto', pct(seg.contactoPct)], ['Potenciales', n0(seg.potenciales)], ['Matriculados', n0(seg.matriculados)]]
-    s.addTable(rows.map((r) => [{ text: r[0], options: { color: MUTED } }, { text: r[1], options: { align: 'right', bold: true } }]),
-      { x: sx, y: 2.2, w: 1.9, fontSize: 11, border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.4 })
-    sx += 2.1
+    s.addText(seg.nombre, { x: sx, y: 1.8, w: 2.0, h: 0.42, align: 'center', valign: 'middle', fontSize: 13, bold: true, color: WHITE, fill: { color: acc } })
+    const rows = [['Leads', n0(seg.leads)], ['Gestionado', pct(seg.contactoPct, 0)], ['Potenciales', n0(seg.potenciales)], ['Matriculados', n0(seg.matriculados)]]
+    s.addTable(rows.map((r, i) => [
+      { text: r[0], options: { color: MUTED, fill: { color: i % 2 ? ZEBRA : WHITE } } },
+      { text: r[1], options: { align: 'right', bold: true, fill: { color: i % 2 ? ZEBRA : WHITE } } },
+    ]), { x: sx, y: 2.22, w: 2.0, fontSize: 11, border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.4 })
+    sx += 2.25
   })
   if (f.notas?.length) s.addText(f.notas.join(' · '), { x: 0.6, y: 6.7, w: 8, h: 0.4, fontSize: 11, italic: true, color: MUTED })
 }
@@ -117,14 +122,16 @@ function tablaPrograma(rows, acc) {
   return [head, ...rows]
 }
 
-function filaP(f) {
+function filaP(f, i = 0) {
+  const bg = i % 2 ? { fill: { color: ZEBRA } } : {}
+  const cell = (text, extra) => ({ text, options: { fontSize: 8, ...bg, ...extra } })
   return [
-    { text: f.nombre, options: { align: 'left', fontSize: 8 } },
-    { text: n0(f.gestionados), options: { align: 'right', fontSize: 8 } },
-    { text: n0(f.noUtil), options: { align: 'right', fontSize: 8 } },
-    { text: n0(f.potenciales), options: { align: 'right', fontSize: 8 } },
-    { text: n0(f.matriculados), options: { align: 'right', fontSize: 8 } },
-    { text: n0(f.total), options: { align: 'right', fontSize: 8 } },
+    cell(f.nombre, { align: 'left' }),
+    cell(n0(f.gestionados), { align: 'right' }),
+    cell(n0(f.noUtil), { align: 'right' }),
+    cell(n0(f.potenciales), { align: 'right' }),
+    cell(n0(f.matriculados), { align: 'right', bold: true }),
+    cell(n0(f.total), { align: 'right' }),
   ]
 }
 
@@ -139,7 +146,7 @@ function slidePrograma(pptx, titulo, filas, acc) {
   const MAX = 22
   let idx = 0, primera = true
   do {
-    const bloque = ordenadas.slice(idx, idx + MAX).map(filaP)
+    const bloque = ordenadas.slice(idx, idx + MAX).map((f, i) => filaP(f, i))
     idx += MAX
     if (idx >= ordenadas.length) bloque.push(totalRow)
     const s = pptx.addSlide()
