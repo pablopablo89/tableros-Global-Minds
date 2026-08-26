@@ -66,23 +66,6 @@ export default function AccountView({ cuenta }) {
       {/* Toolbar / filtros */}
       <div className="toolbar">
         <div className="field">
-          <label>Desde</label>
-          <input type="date" value={toDate(filtros.fechaInicio)} onChange={(e) => setFiltros((f) => ({ ...f, fechaInicio: e.target.value ? new Date(e.target.value).toISOString() : undefined }))} />
-        </div>
-        <div className="field">
-          <label>Hasta</label>
-          <input type="date" value={toDate(filtros.fechaFin)} onChange={(e) => setFiltros((f) => ({ ...f, fechaFin: e.target.value ? new Date(e.target.value).toISOString() : undefined }))} />
-        </div>
-        <div className="field">
-          <label>Semana (lun–dom)</label>
-          <select onChange={(e) => elegirSemana(e.target.value)} defaultValue="">
-            <option value="">Todas</option>
-            {semanas.map((s, i) => (
-              <option key={i} value={i}>{fechaCorta(s.inicio)} – {fechaCorta(s.fin)}</option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
           <label>Cohorte (diplomados)</label>
           <select value={cohorte} onChange={(e) => setCohorte(e.target.value)}>
             <option value="todas">Todas</option>
