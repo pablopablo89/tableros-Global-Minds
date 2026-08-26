@@ -19,6 +19,19 @@ export default function AccountView({ cuenta }) {
   const [filtros, setFiltros] = useState({})
   const [cohorte, setCohorte] = useState('todas')
   const [showReport, setShowReport] = useState(false)
+  const [refrescando, setRefrescando] = useState(false)
+  const [msgRefresco, setMsgRefresco] = useState('')
+
+  const actualizarDatos = async () => {
+    setRefrescando(true); setMsgRefresco('')
+    try {
+      let key = ''
+      try { key = sessionStorage.getItem('nods_app_key') || '' } catch {}
+      const r = await fetch('/api/refresh', { method: 'POST', headers: { 'x-app-key': key } })
+      if (r.ok) setMsgRefresco('✓ Actualización iniciada. Los datos nuevos aparecen en ~2 minutos; recargá la página (Ctrl+Shift+R) en un rato.')
+      else { const j = await r.json().catch(() => ({})); setMsgRefresco('No se pudo iniciar el refresco: ' + (j.error || r.status)) }
+    } catch (e) { setMsgRefresco('Error: ' + e) } finally { setRefrescando(false) }
+  }
   const { loading, error, data, actualizado, modo, recargar } = useAccountData(cuenta, filtros)
 
   const cohortes = useMemo(() => (data ? cohortesDisponibles(data) : []), [data])
@@ -77,9 +90,11 @@ export default function AccountView({ cuenta }) {
           </select>
         </div>
         <div className="spacer" />
-        <button className="btn" onClick={recargar} disabled={loading}>{loading ? 'Cargando…' : '↻ Actualizar'}</button>
+        <button className="btn" onClick={recargar} disabled={loading} title="Recarga la última versión publicada">{loading ? 'Cargando…' : '↻ Recargar'}</button>
+        <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)">{refrescando ? 'Iniciando…' : '⟳ Actualizar datos'}</button>
         <button className="btn primary" onClick={() => setShowReport(true)} disabled={!data}>Generar reporte</button>
       </div>
+      {msgRefresco && <div className="card" style={{ marginBottom: 16 }}><div className="card-b small">{msgRefresco}</div></div>}
 
       {modo !== 'live' && (
         <p className="small faint" style={{ marginTop: -6, marginBottom: 16 }}>

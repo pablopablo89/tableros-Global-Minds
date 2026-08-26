@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/refresh-live.mjs && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

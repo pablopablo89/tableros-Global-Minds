@@ -49,16 +49,12 @@ body { background: var(--surface-2); }
   position: sticky; top: 0; z-index: 20;
   background: var(--surface); border-bottom: 1px solid var(--line);
 }
-.topbar .grad { height: 4px; background: var(--grad); }
-.topbar .inner {
+/* Encabezado real del deck (gradiente + logo NODS|+a) a todo el ancho */
+.topbar .headerimg { display: block; width: 100%; height: 60px; object-fit: cover; object-position: right center; }
+.tabsbar {
   display: flex; align-items: center; gap: 20px;
-  padding: 12px 24px; max-width: 1280px; margin: 0 auto;
+  padding: 8px 24px; max-width: 1280px; margin: 0 auto;
 }
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand img { height: 22px; filter: brightness(0); }
-.brand .div { width: 1px; height: 22px; background: var(--line); }
-.brand .plusa { font-weight: 700; letter-spacing: .5px; font-size: 18px; }
-.brand .plusa small { display: block; font-weight: 400; font-size: 8px; letter-spacing: 3px; color: var(--muted); }
 
 .tabs { display: flex; gap: 4px; margin-left: auto; }
 .tab {

@@ -10,7 +10,8 @@ import { aggregate } from '../src/agg/aggregate.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BASE = (process.env.NODS_API_BASE || 'https://apinods-production.up.railway.app').replace(/\/mcp\/?$/, '')
 const KEY = process.env.NODS_API_KEY
-if (!KEY) { console.error('Falta NODS_API_KEY'); process.exit(1) }
+// Sin key (ej. build local) NO falla: deja los snapshots ya commiteados.
+if (!KEY) { console.warn('NODS_API_KEY ausente → uso snapshots existentes (sin refrescar).'); process.exit(0) }
 
 const now = new Date()
 
@@ -27,6 +28,7 @@ const outDir = path.join(__dirname, '..', 'public', 'snapshots')
 fs.mkdirSync(outDir, { recursive: true })
 
 for (const cfg of CUENTAS) {
+ try {
   const c = cfg.cuenta
   console.log(`\n== ${cfg.nombre} (${c}) ==`)
   // matriculas y consulta_base: base COMPLETA (sin filtro) para totales exactos.
@@ -42,5 +44,8 @@ for (const cfg of CUENTAS) {
   model.actualizado = now.toISOString()
   fs.writeFileSync(path.join(outDir, `${cfg.id}.json`), JSON.stringify(model))
   console.log(`  ✓ snapshot: funnel ${model.funnel.leadsTotales} leads, ${model.funnel.matriculados} matrículas`)
+ } catch (e) {
+  console.error(`  ✗ ${cfg.nombre}: ${e.message} → mantengo snapshot anterior`)
+ }
 }
 console.log('\nListo.')
