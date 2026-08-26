@@ -18,6 +18,7 @@ import ReportModal from '../report/ReportModal.jsx'
 export default function AccountView({ cuenta }) {
   const [filtros, setFiltros] = useState({})
   const [cohorte, setCohorte] = useState('todas')
+  const [semanaSel, setSemanaSel] = useState('todas')
   const [showReport, setShowReport] = useState(false)
   const [refrescando, setRefrescando] = useState(false)
   const [msgRefresco, setMsgRefresco] = useState('')
@@ -35,6 +36,16 @@ export default function AccountView({ cuenta }) {
   const { loading, error, data, actualizado, modo, recargar } = useAccountData(cuenta, filtros)
 
   const cohortes = useMemo(() => (data ? cohortesDisponibles(data) : []), [data])
+  const semanasDisp = data?.semanal || []
+  const semView = semanaSel !== 'todas'
+  // Vista según semana elegida: reemplaza funnel/segmentos/programas/ciudades/tipif/ticket
+  // por el slice de esa semana (guardado en el snapshot). El resto queda del ciclo.
+  const dataVista = useMemo(() => {
+    if (!data) return null
+    if (semanaSel === 'todas') return data
+    const w = (data.semanal || []).find((x) => x.semana === semanaSel)
+    return w ? { ...data, ...w } : data
+  }, [data, semanaSel])
   const semanas = useMemo(() => {
     const hoy = new Date()
     const inicio = new Date(hoy); inicio.setDate(hoy.getDate() - 7 * 11)
@@ -66,6 +77,15 @@ export default function AccountView({ cuenta }) {
       {/* Toolbar / filtros */}
       <div className="toolbar">
         <div className="field">
+          <label>Semana (lun–dom)</label>
+          <select value={semanaSel} onChange={(e) => setSemanaSel(e.target.value)}>
+            <option value="todas">Todo el ciclo</option>
+            {semanasDisp.map((s) => (
+              <option key={s.semana} value={s.semana}>{fechaCorta(s.semana)} – {fechaCorta(s.fin)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
           <label>Cohorte (diplomados)</label>
           <select value={cohorte} onChange={(e) => setCohorte(e.target.value)}>
             <option value="todas">Todas</option>
@@ -88,44 +108,54 @@ export default function AccountView({ cuenta }) {
       {loading && <div className="card"><div className="card-b">Cargando datos…</div></div>}
       {error && <div className="card"><div className="card-b down">Error: {error}</div></div>}
 
-      {data && (
+      {dataVista && (
         <>
+          {semView && (
+            <div className="card" style={{ marginBottom: 16, borderColor: cuenta.acento }}>
+              <div className="card-b small">
+                📅 Mostrando <b>la semana seleccionada</b> (lun–dom). Los objetivos, la inversión y la evolución son del ciclo completo y se ocultan en esta vista. Elegí <b>"Todo el ciclo"</b> para volver.
+              </div>
+            </div>
+          )}
+
           {/* KPIs */}
           <div className="grid cols-4">
-            <Kpi lbl="Leads totales" val={n0(data.funnel.leadsTotales)} />
-            <Kpi lbl="En gestión" val={n0(data.funnel.enGestion)} />
-            <Kpi lbl="Potenciales" val={n0(data.funnel.potenciales)} />
-            <Kpi lbl="Matriculados" val={n0(data.funnel.matriculados)} />
+            <Kpi lbl="Leads totales" val={n0(dataVista.funnel.leadsTotales)} />
+            <Kpi lbl="En gestión" val={n0(dataVista.funnel.enGestion)} />
+            <Kpi lbl="Potenciales" val={n0(dataVista.funnel.potenciales)} />
+            <Kpi lbl="Matriculados" val={n0(dataVista.funnel.matriculados)} />
           </div>
 
           <div className="section-title">Resumen</div>
           <div className="grid cols-2">
-            <Funnel data={data} cfg={cuenta} />
-            <Insights data={data} cfg={cuenta} />
+            <Funnel data={dataVista} cfg={cuenta} />
+            {semView ? <Ticket data={dataVista} cfg={cuenta} /> : <Insights data={dataVista} cfg={cuenta} />}
           </div>
 
-          <div className="section-title">Objetivos · inversión · semana</div>
-          <div className="grid" style={{ gridTemplateColumns: '1fr' }}>
-            <Metas data={data} cfg={cuenta} />
-            <WeeklyLeads data={data} cfg={cuenta} />
-          </div>
+          {!semView && <>
+            <div className="section-title">Objetivos · inversión · semana</div>
+            <div className="grid" style={{ gridTemplateColumns: '1fr' }}>
+              <Metas data={data} cfg={cuenta} />
+              <WeeklyLeads data={data} cfg={cuenta} />
+            </div>
 
-          <div className="section-title">Evolución diaria</div>
-          <DailyChart data={data} cfg={cuenta} />
+            <div className="section-title">Evolución diaria</div>
+            <DailyChart data={data} cfg={cuenta} />
+          </>}
 
           <div className="section-title">Detalle por programa</div>
           <div className="grid" style={{ gridTemplateColumns: '1fr' }}>
-            <ProgramTable titulo={segPrincipal(cuenta).nombre} filas={programasDe(data, segPrincipal(cuenta).id)} />
-            <ProgramTable titulo="Diplomados" filas={programasDe(data, segDiplomados(cuenta).id)} agruparCohorte cohorteFiltro={cohorte} />
+            <ProgramTable titulo={segPrincipal(cuenta).nombre} filas={programasDe(dataVista, segPrincipal(cuenta).id)} />
+            <ProgramTable titulo="Diplomados" filas={programasDe(dataVista, segDiplomados(cuenta).id)} agruparCohorte cohorteFiltro={cohorte} />
           </div>
 
           <div className="section-title">Geografía</div>
-          <CityChart data={data} />
+          <CityChart data={dataVista} />
 
           <div className="section-title">Motivos de no compra y ticket</div>
           <div className="grid" style={{ gridTemplateColumns: '1fr' }}>
-            <Tipificaciones data={data} cfg={cuenta} />
-            <Ticket data={data} cfg={cuenta} />
+            <Tipificaciones data={dataVista} cfg={cuenta} />
+            <Ticket data={dataVista} cfg={cuenta} />
           </div>
         </>
       )}

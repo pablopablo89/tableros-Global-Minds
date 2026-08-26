@@ -72,9 +72,6 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
     fecha: l.fecha_insercion || l.ts,
   }))
 
-  const esNoUtil = esNoUtilSub
-  const esPotencial = (sub) => POTENCIAL.has(sub)
-
   // ---------- Matrículas ----------
   const mats = matriculas.map((m) => ({
     seg: segmentoDe(m.programa, cfg),
@@ -86,7 +83,38 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
     precio: money(m.precio_con_descuento) || money(m.precio_full),
   }))
 
-  // ---------- Funnel global ----------
+  // ---------- Núcleo (funnel/segmentos/programas/ciudades/tipificaciones/ticket/ingresos) ----------
+  const { funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos } = nucleo(leads, mats, cfg)
+
+  // ---------- Metas / inversión (objetivos + meta) ----------
+  const metas = construirMetas(objetivos, meta, mats, leads, cfg)
+
+  // ---------- Leads por semana ----------
+  const leadsSemana = construirLeadsSemana(leads, cfg)
+
+  // ---------- Evolución SEMANAL (neto + acumulado) vs objetivo, acotada al ciclo ----------
+  const daily = construirDaily(leads, mats, objetivos, cfg)
+
+  // cohortes disponibles (para el filtro)
+  const cohortes = [...new Set(programas.filter((p) => p.cohorte).map((p) => p.cohorte))].sort()
+
+  // ---------- Desglose por SEMANA (para el filtro semanal, sin re-consultar la API) ----------
+  const semanal = construirSemanal(leads, mats, cfg)
+
+  return {
+    fechaCorte: new Date().toISOString().slice(0, 10),
+    cuenta: cfg.id,
+    moneda: cfg.moneda,
+    funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, metas, leadsSemana, daily, cohortes, semanal,
+    cobertura: { leads: leads.length, matriculas: mats.length },
+  }
+}
+
+// Cálculo central sobre subconjuntos de leads/matrículas ya mapeados.
+function nucleo(leads, mats, cfg) {
+  const esNoUtil = esNoUtilSub
+  const esPotencial = (sub) => POTENCIAL.has(sub)
+
   const funnel = {
     leadsTotales: leads.length,
     noUtiles: leads.filter((l) => esNoUtil(l.sub)).length,
@@ -96,24 +124,17 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
     notas: [],
   }
 
-  // ---------- Segmentos ----------
   const segmentos = cfg.segmentos.map((s) => {
     const ls = leads.filter((l) => l.seg === s.id)
     const gest = ls.filter((l) => l.gestionado).length
     return {
-      id: s.id,
-      nombre: s.nombre,
-      leads: ls.length,
-      gestionados: gest,
+      id: s.id, nombre: s.nombre, leads: ls.length, gestionados: gest,
       contactoPct: ls.length ? (gest / ls.length) * 100 : 0,
       potenciales: ls.filter((l) => esPotencial(l.sub)).length,
       matriculados: mats.filter((m) => m.seg === s.id).length,
     }
   })
 
-  // ---------- Detalle por programa ----------
-  // Clave por programa NORMALIZADO (fusiona variantes de escritura). La cohorte
-  // sólo separa filas en diplomados. Se conserva el nombre de la 1ra aparición.
   const progMap = new Map()
   const keyP = (seg, nombre, cohorte) => `${seg}||${normKey(nombre)}||${cohorte || ''}`
   for (const l of leads) {
@@ -131,8 +152,6 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
     if (!m.seg) continue
     const co = m.seg === 'dip' ? m.cohorte : null
     let k = keyP(m.seg, m.programa, co)
-    // si el programa existe sin importar cohorte (matrícula sin cohorte), intentar
-    // adjuntar a una fila existente del mismo programa antes de crear una nueva.
     if (!progMap.has(k) && m.seg === 'dip' && !co) {
       const alt = [...progMap.keys()].find((kk) => kk.startsWith(`${m.seg}||${normKey(m.programa)}||`))
       if (alt) k = alt
@@ -142,50 +161,42 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   }
   const programas = [...progMap.values()]
 
-  // ---------- Ciudades (por matrículas) ----------
   const ciuMap = new Map()
-  for (const m of mats) {
-    const c = m.ciudad || 'Sin especificar'
-    ciuMap.set(c, (ciuMap.get(c) || 0) + 1)
-  }
+  for (const m of mats) { const c = m.ciudad || 'Sin especificar'; ciuMap.set(c, (ciuMap.get(c) || 0) + 1) }
   const ciudades = [...ciuMap.entries()].map(([ciudad, matriculados]) => ({ ciudad, matriculados })).sort((a, b) => b.matriculados - a.matriculados)
 
-  // ---------- Motivos de no compra (declinado) por segmento ----------
   const tipificaciones = {}
   for (const s of cfg.segmentos) {
     const m = new Map()
-    for (const l of leads) {
-      if (l.seg !== s.id) continue
-      if (!esNoUtilSub(l.sub)) continue
-      m.set(l.sub, (m.get(l.sub) || 0) + 1)
-    }
-    tipificaciones[s.id] = [...m.entries()].map(([motivo, leads]) => ({ motivo, leads })).sort((a, b) => b.leads - a.leads)
+    for (const l of leads) { if (l.seg !== s.id) continue; if (!esNoUtilSub(l.sub)) continue; m.set(l.sub, (m.get(l.sub) || 0) + 1) }
+    tipificaciones[s.id] = [...m.entries()].map(([motivo, lds]) => ({ motivo, leads: lds })).sort((a, b) => b.leads - a.leads)
   }
 
-  // ---------- Ticket promedio + ingresos estimados ----------
   const ticket = ticketPromedio(mats, cfg)
   const ingresos = { total: mats.reduce((a, m) => a + m.precio, 0), porSegmento: {} }
   for (const s of cfg.segmentos) ingresos.porSegmento[s.id] = mats.filter((m) => m.seg === s.id).reduce((a, m) => a + m.precio, 0)
 
-  // ---------- Metas / inversión (objetivos + meta) ----------
-  const metas = construirMetas(objetivos, meta, mats, leads, cfg)
+  return { funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, cobertura: { leads: leads.length, matriculas: mats.length } }
+}
 
-  // ---------- Leads por semana ----------
-  const leadsSemana = construirLeadsSemana(leads, cfg)
+// Un slice de `nucleo` por cada semana (lun-dom) del ciclo, para el filtro semanal.
+function construirSemanal(leads, mats, cfg) {
+  const anios = mats.map((m) => (String(m.fechaPago).match(/^(\d{4})/) || [])[1]).filter(Boolean)
+  const cycleYear = anios.length ? moda(anios) : String(new Date().getFullYear())
+  const desde = `${cycleYear}-01-01`
+  const enCiclo = (f) => f && String(f).slice(0, 10) >= desde
 
-  // ---------- Evolución SEMANAL (neto + acumulado) vs objetivo, acotada al ciclo ----------
-  const daily = construirDaily(leads, mats, objetivos, cfg)
+  const semanas = new Map() // lunesISO -> { leads:[], mats:[] }
+  const bucket = (k) => { if (!semanas.has(k)) semanas.set(k, { leads: [], mats: [] }); return semanas.get(k) }
+  for (const l of leads) if (enCiclo(l.fecha)) bucket(lunesISO(l.fecha)).leads.push(l)
+  for (const m of mats) if (enCiclo(m.fechaPago)) bucket(lunesISO(m.fechaPago)).mats.push(m)
 
-  // cohortes disponibles (para el filtro)
-  const cohortes = [...new Set(programas.filter((p) => p.cohorte).map((p) => p.cohorte))].sort()
-
-  return {
-    fechaCorte: new Date().toISOString().slice(0, 10),
-    cuenta: cfg.id,
-    moneda: cfg.moneda,
-    funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, metas, leadsSemana, daily, cohortes,
-    cobertura: { leads: leads.length, matriculas: mats.length },
-  }
+  return [...semanas.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0])) // más reciente primero
+    .map(([semana, { leads: ls, mats: ms }]) => {
+      const fin = new Date(semana + 'T00:00:00'); fin.setDate(fin.getDate() + 6)
+      return { semana, fin: fin.toISOString().slice(0, 10), ...nucleo(ls, ms, cfg) }
+    })
 }
 
 function ticketPromedio(mats, cfg) {
