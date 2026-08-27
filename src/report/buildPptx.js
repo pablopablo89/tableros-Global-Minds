@@ -105,7 +105,7 @@ function slideFunnel(pptx, cfg, data, acc) {
   let sx = 8.9
   data.segmentos.forEach((seg) => {
     s.addText(seg.nombre, { x: sx, y: 1.8, w: 2.0, h: 0.42, align: 'center', valign: 'middle', fontSize: 13, bold: true, color: WHITE, fill: { color: acc } })
-    const rows = [['Leads', n0(seg.leads)], ['Gestionado', pct(seg.contactoPct, 0)], ['Potenciales', n0(seg.potenciales)], ['Matriculados', n0(seg.matriculados)]]
+    const rows = [['Leads', n0(seg.leads)], ['Contacto', pct(seg.contactoPct, 0)], ['Potenciales', n0(seg.potenciales)], ['Matriculados', n0(seg.matriculados)]]
     s.addTable(rows.map((r, i) => [
       { text: r[0], options: { color: MUTED, fill: { color: i % 2 ? ZEBRA : WHITE } } },
       { text: r[1], options: { align: 'right', bold: true, fill: { color: i % 2 ? ZEBRA : WHITE } } },

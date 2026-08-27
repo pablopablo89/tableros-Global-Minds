@@ -119,7 +119,7 @@ function slideFunnel(ctx) {
     autoTable(doc, {
       startY: 34, margin: { left: sx }, tableWidth: 45,
       head: [[seg.nombre, '']], headStyles: { fillColor: acc, textColor: WHITE, fontStyle: 'bold', fontSize: 9 },
-      body: [['Leads', n0(seg.leads)], ['Gestionado', pct(seg.contactoPct, 0)], ['Potenciales', n0(seg.potenciales)], ['Matriculados', n0(seg.matriculados)]],
+      body: [['Leads', n0(seg.leads)], ['Contacto', pct(seg.contactoPct, 0)], ['Potenciales', n0(seg.potenciales)], ['Matriculados', n0(seg.matriculados)]],
       bodyStyles: { fontSize: 8, textColor: INK }, columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
       styles: { lineColor: LINE, lineWidth: 0.2 },
     })

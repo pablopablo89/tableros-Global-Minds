@@ -86,7 +86,7 @@ export default function Funnel({ data, cfg }) {
               <div key={s.id} className="segcard">
                 <div className="sc-h">{s.nombre}</div>
                 <div className="sc-row"><span className="k">Leads</span><span className="v">{n0(s.leads)}</span></div>
-                <div className="sc-row"><span className="k">Gestionado</span><span className="v">{pct(s.contactoPct, 0)}</span></div>
+                <div className="sc-row"><span className="k">Contacto</span><span className="v">{pct(s.contactoPct, 0)}</span></div>
                 <div className="sc-row"><span className="k">Potenciales</span><span className="v">{n0(s.potenciales)}</span></div>
                 <div className="sc-row"><span className="k">Matriculados</span><span className="v">{n0(s.matriculados)}</span></div>
               </div>

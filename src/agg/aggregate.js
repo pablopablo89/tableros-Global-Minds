@@ -22,6 +22,17 @@ const NO_UTIL = new Set([
 ])
 // Motivo si está en NO_UTIL o empieza con "Busca " (maestría/posgrado/pregrado/curso corto).
 const esNoUtilSub = (sub) => NO_UTIL.has(sub) || /^busca /i.test(sub || '')
+
+// Tasa de CONTACTO: se cuentan como NO contactados sólo los estados donde nunca
+// se llegó a hablar con la persona. El resto (respondió, dio info, declinó, etc.)
+// cuenta como contacto. Coincide con el flag "contactado" del catálogo de NODS (~40-45%).
+const NO_CONTACTO = new Set([
+  'No contesta', 'Buzon de voz', 'Volver a llamar', 'Teléfono erróneo o fuera de servicio',
+  'Cierre de lead por no contacto', 'Duplicado', 'Imposible contactar', 'NotProcessed',
+  'TimeoutCategorization', 'NoAnswerDialer', 'RejectedDialer', 'CongestionDialer',
+  'AnswerRingingDialer', 'AnswerQueueDialer', 'WithoutPhones', 'Agenda telefonica',
+])
+const esContactado = (sub) => !!sub && !NO_CONTACTO.has(sub)
 // Tipificaciones "potencial" (en proceso de pago).
 const POTENCIAL = new Set(['En proceso de pago', 'En proceso de pago - No contesta'])
 
@@ -127,9 +138,10 @@ function nucleo(leads, mats, cfg) {
   const segmentos = cfg.segmentos.map((s) => {
     const ls = leads.filter((l) => l.seg === s.id)
     const gest = ls.filter((l) => l.gestionado).length
+    const cont = ls.filter((l) => esContactado(l.sub)).length
     return {
       id: s.id, nombre: s.nombre, leads: ls.length, gestionados: gest,
-      contactoPct: ls.length ? (gest / ls.length) * 100 : 0,
+      contactoPct: ls.length ? (cont / ls.length) * 100 : 0, // tasa de contacto real
       potenciales: ls.filter((l) => esPotencial(l.sub)).length,
       matriculados: mats.filter((m) => m.seg === s.id).length,
     }
