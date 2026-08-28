@@ -40,7 +40,7 @@ export async function generarPptx(data, cfg, seleccion) {
   if (inc('funnel')) slideFunnel(pptx, cfg, data, acc)
   // Programas CONSOLIDADOS (una fila por programa, sumando todas las cohortes/bases).
   if (inc('prog_principal')) slidePrograma(pptx, `Detalle por programa — ${segPrincipal(cfg).nombre}`, consolidarProgramas(programasDe(data, segPrincipal(cfg).id)), acc)
-  if (inc('prog_diplomados')) slidePrograma(pptx, 'Detalle por programa — Diplomados', consolidarProgramas(programasDe(data, segDiplomados(cfg).id)), acc)
+  if (inc('prog_diplomados')) slidePrograma(pptx, 'Detalle por programa — Diplomados', consolidarProgramas(programasDe(data, segDiplomados(cfg).id)).filter((p) => p.total >= 3), acc)
   if (inc('ciudad')) slideCiudad(pptx, cfg, data, acc)
   if (inc('motivos')) slideMotivos(pptx, cfg, data, acc)
   if (inc('objetivos')) slideObjetivos(pptx, cfg, data, acc)

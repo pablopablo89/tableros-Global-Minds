@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAccountData } from '../data/useAccountData.js'
 import { n0, fecha } from '../lib/format.js'
-import { cohortesDisponibles, programasDe, segPrincipal, segDiplomados } from '../lib/derive.js'
+import { programasDe, segPrincipal, segDiplomados, consolidarProgramas } from '../lib/derive.js'
 import { semanasEntre } from '../lib/weeks.js'
 import { fechaCorta } from '../lib/format.js'
 import Funnel from './Funnel.jsx'
@@ -17,7 +17,6 @@ import ReportModal from '../report/ReportModal.jsx'
 
 export default function AccountView({ cuenta }) {
   const [filtros, setFiltros] = useState({})
-  const [cohorte, setCohorte] = useState('todas')
   const [semanaSel, setSemanaSel] = useState('todas')
   const [showReport, setShowReport] = useState(false)
   const [refrescando, setRefrescando] = useState(false)
@@ -35,7 +34,6 @@ export default function AccountView({ cuenta }) {
   }
   const { loading, error, data, actualizado, modo, recargar } = useAccountData(cuenta, filtros)
 
-  const cohortes = useMemo(() => (data ? cohortesDisponibles(data) : []), [data])
   const semanasDisp = data?.semanal || []
   const semView = semanaSel !== 'todas'
   // Vista según semana elegida: reemplaza funnel/segmentos/programas/ciudades/tipif/ticket
@@ -83,13 +81,6 @@ export default function AccountView({ cuenta }) {
             {semanasDisp.map((s) => (
               <option key={s.semana} value={s.semana}>{fechaCorta(s.semana)} – {fechaCorta(s.fin)}</option>
             ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Cohorte (diplomados)</label>
-          <select value={cohorte} onChange={(e) => setCohorte(e.target.value)}>
-            <option value="todas">Todas</option>
-            {cohortes.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div className="spacer" />
@@ -145,8 +136,8 @@ export default function AccountView({ cuenta }) {
 
           <div className="section-title">Detalle por programa</div>
           <div className="grid" style={{ gridTemplateColumns: '1fr' }}>
-            <ProgramTable titulo={segPrincipal(cuenta).nombre} filas={programasDe(dataVista, segPrincipal(cuenta).id)} />
-            <ProgramTable titulo="Diplomados" filas={programasDe(dataVista, segDiplomados(cuenta).id)} agruparCohorte cohorteFiltro={cohorte} />
+            <ProgramTable titulo={segPrincipal(cuenta).nombre} filas={consolidarProgramas(programasDe(dataVista, segPrincipal(cuenta).id))} />
+            <ProgramTable titulo="Diplomados" filas={consolidarProgramas(programasDe(dataVista, segDiplomados(cuenta).id)).filter((p) => p.total >= 3)} />
           </div>
 
           <div className="section-title">Geografía</div>
