@@ -12,9 +12,7 @@ export function generarInsights(data, cfg) {
   const f = data.funnel
   const totalMat = f.matriculados || 0
 
-  // ---- Ingreso estimado del ciclo ----
-  const ing = data.ingresos?.total || 0
-  if (ing > 0) add('pos', 95, `💰 Ingreso estimado del ciclo: <b>${money(ing, mon)}</b> en ${n0(totalMat)} matrículas.`)
+  // (Ingreso/ROAS omitidos: el precio de la API refleja cuotas, no el total confiable.)
 
   // ---- Ritmo vs objetivo de matrículas + proyección ----
   const mm = data.metas?.matriculas
@@ -39,7 +37,7 @@ export function generarInsights(data, cfg) {
     if (Math.abs(d) >= 25) add(d > 0 ? 'pos' : 'neg', 80, `${d > 0 ? '🚀' : '⚠️'} Leads últimos 7 días: <b>${n0(semLeads.ultima)}</b> (${d > 0 ? '+' : ''}${pct(d, 0)} vs semana previa).`)
   }
 
-  // ---- Inversión: CPL, CAC y ROAS DENTRO de la ventana con gasto (comparable) ----
+  // ---- Inversión: CPL y CAC DENTRO de la ventana con gasto (sin ROAS: precio poco confiable) ----
   const inv = data.metas?.leads?.inversion || 0
   const v = data.metas?.inversionVentana
   if (inv > 0 && v) {
@@ -47,10 +45,6 @@ export function generarInsights(data, cfg) {
     const cpl = v.leads ? inv / v.leads : null
     const cac = v.matriculas >= 10 ? inv / v.matriculas : null // CAC sólo con muestra suficiente
     if (cpl) add('neu', 86, `🧮 En la ventana con inversión${per}: <b>${money(cpl, mon)}</b> por lead${cac ? ` y <b>${money(cac, mon)}</b> por matrícula` : ''}.`)
-    if (v.ingreso > 0 && v.matriculas >= 8) {
-      const roas = v.ingreso / inv
-      add(roas >= 3 ? 'pos' : roas >= 1 ? 'neu' : 'neg', 84, `📊 ROAS en esa ventana ≈ <b>${roas.toFixed(1)}×</b> (ingreso ${money(v.ingreso, mon)} / inversión ${money(inv, mon)}).`)
-    }
   } else if (inv > 0) {
     add('neu', 70, `🧮 Inversión en ads registrada: <b>${money(inv, mon)}</b>.`)
   }
