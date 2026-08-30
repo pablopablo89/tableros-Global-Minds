@@ -54,13 +54,38 @@ export function pasosFunnel(f) {
 
 function pct(a, b) { return b ? (a / b) * 100 : 0 }
 
-// Consolida filas de programa por NOMBRE (suma todas las cohortes/bases).
-// Para el reporte: una fila por programa, no base por base.
+const normNombre = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+
+// Distancia de edición (Levenshtein) acotada.
+function editDist(a, b) {
+  const la = a.length, lb = b.length
+  if (Math.abs(la - lb) > 6) return 99
+  const dp = Array.from({ length: lb + 1 }, (_, j) => j)
+  for (let i = 1; i <= la; i++) {
+    let prev = dp[0]; dp[0] = i
+    for (let j = 1; j <= lb; j++) {
+      const tmp = dp[j]
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1))
+      prev = tmp
+    }
+  }
+  return dp[lb]
+}
+// ¿Son "prácticamente el mismo" nombre? (diferencia de pocas letras / typo)
+function nombresSimilares(a, b) {
+  if (a === b) return true
+  const maxLen = Math.max(a.length, b.length)
+  if (maxLen < 12) return false // nombres cortos: exigimos igualdad exacta
+  return editDist(a, b) <= Math.max(2, Math.round(maxLen * 0.06))
+}
+
+// Consolida filas de programa por NOMBRE (suma cohortes/bases) y ADEMÁS fusiona
+// nombres casi idénticos (typos, una letra de diferencia).
 export function consolidarProgramas(filas) {
-  const key = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim()
+  // paso 1: merge exacto por nombre normalizado
   const mapa = new Map()
   for (const f of filas) {
-    const k = key(f.nombre)
+    const k = normNombre(f.nombre)
     if (!mapa.has(k)) mapa.set(k, { ...f, cohorte: null })
     else {
       const a = mapa.get(k)
@@ -68,7 +93,17 @@ export function consolidarProgramas(filas) {
       a.potenciales += f.potenciales; a.matriculados += f.matriculados; a.total += f.total
     }
   }
-  return [...mapa.values()].sort((a, b) => b.matriculados - a.matriculados)
+  // paso 2: fusión difusa (el de mayor total conserva el nombre)
+  const items = [...mapa.values()].map((r) => ({ r, k: normNombre(r.nombre) })).sort((a, b) => b.r.total - a.r.total)
+  const out = []
+  for (const it of items) {
+    const dst = out.find((o) => nombresSimilares(o.k, it.k))
+    if (dst) {
+      dst.r.gestionados += it.r.gestionados; dst.r.noUtil += it.r.noUtil
+      dst.r.potenciales += it.r.potenciales; dst.r.matriculados += it.r.matriculados; dst.r.total += it.r.total
+    } else out.push({ r: { ...it.r }, k: it.k })
+  }
+  return out.map((o) => o.r).sort((a, b) => b.matriculados - a.matriculados)
 }
 
 export function cohortesDisponibles(data) {

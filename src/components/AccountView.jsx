@@ -23,14 +23,28 @@ export default function AccountView({ cuenta }) {
   const [msgRefresco, setMsgRefresco] = useState('')
 
   const actualizarDatos = async () => {
-    setRefrescando(true); setMsgRefresco('')
+    setRefrescando(true); setMsgRefresco('Iniciando actualización…')
+    let key = ''
+    try { key = sessionStorage.getItem('nods_app_key') || '' } catch {}
+    const prev = data?.actualizado
     try {
-      let key = ''
-      try { key = sessionStorage.getItem('nods_app_key') || '' } catch {}
       const r = await fetch('/api/refresh', { method: 'POST', headers: { 'x-app-key': key } })
-      if (r.ok) setMsgRefresco('✓ Actualización iniciada. Los datos nuevos aparecen en ~2 minutos; recargá la página (Ctrl+Shift+R) en un rato.')
-      else { const j = await r.json().catch(() => ({})); setMsgRefresco('No se pudo iniciar el refresco: ' + (j.error || r.status)) }
-    } catch (e) { setMsgRefresco('Error: ' + e) } finally { setRefrescando(false) }
+      if (!r.ok) { const j = await r.json().catch(() => ({})); setMsgRefresco('No se pudo iniciar: ' + (j.error || r.status)); setRefrescando(false); return }
+      setMsgRefresco('⏳ Trayendo datos nuevos de NODS… tarda ~2 minutos, dejá esta pestaña abierta.')
+      const start = Date.now()
+      const poll = async () => {
+        if (Date.now() - start > 300000) { setMsgRefresco('Está tardando más de lo normal. Probá recargar la página en unos minutos.'); setRefrescando(false); return }
+        try {
+          const s = await fetch(`/snapshots/${cuenta.id}.json?t=${Date.now()}`, { cache: 'no-store' })
+          if (s.ok) {
+            const j = await s.json()
+            if (j.actualizado && j.actualizado !== prev) { setMsgRefresco('✓ ¡Datos actualizados!'); setRefrescando(false); recargar(); return }
+          }
+        } catch {}
+        setTimeout(poll, 12000)
+      }
+      setTimeout(poll, 25000)
+    } catch (e) { setMsgRefresco('Error: ' + e); setRefrescando(false) }
   }
   const { loading, error, data, actualizado, modo, recargar } = useAccountData(cuenta, filtros)
 
@@ -84,8 +98,7 @@ export default function AccountView({ cuenta }) {
           </select>
         </div>
         <div className="spacer" />
-        <button className="btn" onClick={recargar} disabled={loading} title="Recarga la última versión publicada">{loading ? 'Cargando…' : '↻ Recargar'}</button>
-        <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)">{refrescando ? 'Iniciando…' : '⟳ Actualizar datos'}</button>
+        <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)">{refrescando ? '⏳ Actualizando…' : '⟳ Actualizar datos'}</button>
         <button className="btn primary" onClick={() => setShowReport(true)} disabled={!data}>Generar reporte</button>
       </div>
       {msgRefresco && <div className="card" style={{ marginBottom: 16 }}><div className="card-b small">{msgRefresco}</div></div>}
