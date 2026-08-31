@@ -109,8 +109,9 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   // cohortes disponibles (para el filtro)
   const cohortes = [...new Set(programas.filter((p) => p.cohorte).map((p) => p.cohorte))].sort()
 
-  // ---------- Desglose por SEMANA (para el filtro semanal, sin re-consultar la API) ----------
+  // ---------- Desglose por SEMANA y por MES (para los filtros, sin re-consultar la API) ----------
   const semanal = construirSemanal(leads, mats, cfg)
+  const mensual = construirMensual(leads, mats, cfg)
 
   // ---------- Ventas (matrículas) del mes en curso, por segmento ----------
   const ventasMes = construirVentasMes(mats, cfg)
@@ -119,9 +120,26 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
     fechaCorte: new Date().toISOString().slice(0, 10),
     cuenta: cfg.id,
     moneda: cfg.moneda,
-    funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, metas, leadsSemana, daily, cohortes, semanal, ventasMes,
+    funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, metas, leadsSemana, daily, cohortes, semanal, mensual, ventasMes,
     cobertura: { leads: leads.length, matriculas: mats.length },
   }
+}
+
+// Un slice de `nucleo` por cada MES del ciclo (leads por fecha_insercion, matrículas por fecha_de_pago).
+function construirMensual(leads, mats, cfg) {
+  const anios = mats.map((m) => (String(m.fechaPago).match(/^(\d{4})/) || [])[1]).filter(Boolean)
+  const cycleYear = anios.length ? moda(anios) : String(new Date().getFullYear())
+  const enCiclo = (f) => f && String(f).slice(0, 4) === cycleYear
+  const mesDe = (f) => String(f).slice(0, 7)
+
+  const meses = new Map()
+  const bucket = (k) => { if (!meses.has(k)) meses.set(k, { leads: [], mats: [] }); return meses.get(k) }
+  for (const l of leads) if (enCiclo(l.fecha)) bucket(mesDe(l.fecha)).leads.push(l)
+  for (const m of mats) if (enCiclo(m.fechaPago)) bucket(mesDe(m.fechaPago)).mats.push(m)
+
+  return [...meses.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([mes, { leads: ls, mats: ms }]) => ({ mes, ...nucleo(ls, ms, cfg) }))
 }
 
 // Matrículas del mes más reciente con ventas (mes en curso), por segmento.

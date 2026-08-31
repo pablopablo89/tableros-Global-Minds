@@ -49,13 +49,18 @@ export default function AccountView({ cuenta }) {
   const { loading, error, data, actualizado, modo, recargar } = useAccountData(cuenta, filtros)
 
   const semanasDisp = data?.semanal || []
-  const semView = semanaSel !== 'todas'
-  // Vista según semana elegida: reemplaza funnel/segmentos/programas/ciudades/tipif/ticket
-  // por el slice de esa semana (guardado en el snapshot). El resto queda del ciclo.
+  const mesesDisp = data?.mensual || []
+  const semView = semanaSel !== 'todas' // hay un período (mes o semana) seleccionado
+  // Vista según período elegido (M:<mes> o S:<lunes>): reemplaza el núcleo por el slice
+  // guardado en el snapshot. El resto (objetivos, evolución) queda del ciclo.
   const dataVista = useMemo(() => {
     if (!data) return null
     if (semanaSel === 'todas') return data
-    const w = (data.semanal || []).find((x) => x.semana === semanaSel)
+    if (semanaSel.startsWith('M:')) {
+      const m = (data.mensual || []).find((x) => x.mes === semanaSel.slice(2))
+      return m ? { ...data, ...m } : data
+    }
+    const w = (data.semanal || []).find((x) => x.semana === semanaSel.replace(/^S:/, ''))
     return w ? { ...data, ...w } : data
   }, [data, semanaSel])
   const semanas = useMemo(() => {
@@ -89,12 +94,15 @@ export default function AccountView({ cuenta }) {
       {/* Toolbar / filtros */}
       <div className="toolbar">
         <div className="field">
-          <label>Semana (lun–dom)</label>
+          <label>Período</label>
           <select value={semanaSel} onChange={(e) => setSemanaSel(e.target.value)}>
             <option value="todas">Todo el ciclo</option>
-            {semanasDisp.map((s) => (
-              <option key={s.semana} value={s.semana}>{fechaCorta(s.semana)} – {fechaCorta(s.fin)}</option>
-            ))}
+            <optgroup label="Por mes">
+              {mesesDisp.map((m) => <option key={m.mes} value={'M:' + m.mes}>{mesLabel(m.mes)}</option>)}
+            </optgroup>
+            <optgroup label="Por semana (lun–dom)">
+              {semanasDisp.map((s) => <option key={s.semana} value={'S:' + s.semana}>{fechaCorta(s.semana)} – {fechaCorta(s.fin)}</option>)}
+            </optgroup>
           </select>
         </div>
         <div className="spacer" />
@@ -117,7 +125,7 @@ export default function AccountView({ cuenta }) {
           {semView && (
             <div className="card" style={{ marginBottom: 16, borderColor: cuenta.acento }}>
               <div className="card-b small">
-                📅 Mostrando <b>la semana seleccionada</b> (lun–dom). Los objetivos, la inversión y la evolución son del ciclo completo y se ocultan en esta vista. Elegí <b>"Todo el ciclo"</b> para volver.
+                📅 Mostrando <b>el período seleccionado</b>. Los objetivos, la inversión y la evolución son del ciclo completo y se ocultan en esta vista. Elegí <b>"Todo el ciclo"</b> para volver.
               </div>
             </div>
           )}
