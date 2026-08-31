@@ -130,6 +130,29 @@ export default function AccountView({ cuenta }) {
             <Kpi lbl="Matriculados" val={n0(dataVista.funnel.matriculados)} />
           </div>
 
+          {data.ventasMes && (
+            <div className="card" style={{ marginTop: 18 }}>
+              <div className="card-h">
+                <h2>Ventas del mes — {mesLabel(data.ventasMes.mes)}</h2>
+                <span className="hint">matrículas acumuladas del mes en curso</span>
+              </div>
+              <div className="card-b">
+                <div className="grid cols-3">
+                  {cuenta.segmentos.map((s) => (
+                    <div key={s.id} className="card kpi" style={{ boxShadow: 'none' }}>
+                      <div className="lbl">{s.nombre}</div>
+                      <div className="val">{n0(data.ventasMes.porSegmento[s.id] || 0)}</div>
+                    </div>
+                  ))}
+                  <div className="card kpi" style={{ boxShadow: 'none', borderColor: cuenta.acento }}>
+                    <div className="lbl">Total</div>
+                    <div className="val" style={{ color: cuenta.acento }}>{n0(data.ventasMes.total)}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="section-title">Resumen</div>
           <div className="grid cols-2">
             <Funnel data={dataVista} cfg={cuenta} />
@@ -176,6 +199,14 @@ function Kpi({ lbl, val }) {
       <div className="val">{val}</div>
     </div>
   )
+}
+
+function mesLabel(yyyymm) {
+  try {
+    const d = new Date(yyyymm + '-01T00:00:00')
+    const s = d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  } catch { return yyyymm }
 }
 
 function toDate(iso) {

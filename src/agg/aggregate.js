@@ -112,13 +112,27 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   // ---------- Desglose por SEMANA (para el filtro semanal, sin re-consultar la API) ----------
   const semanal = construirSemanal(leads, mats, cfg)
 
+  // ---------- Ventas (matrículas) del mes en curso, por segmento ----------
+  const ventasMes = construirVentasMes(mats, cfg)
+
   return {
     fechaCorte: new Date().toISOString().slice(0, 10),
     cuenta: cfg.id,
     moneda: cfg.moneda,
-    funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, metas, leadsSemana, daily, cohortes, semanal,
+    funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, metas, leadsSemana, daily, cohortes, semanal, ventasMes,
     cobertura: { leads: leads.length, matriculas: mats.length },
   }
+}
+
+// Matrículas del mes más reciente con ventas (mes en curso), por segmento.
+function construirVentasMes(mats, cfg) {
+  const meses = mats.map((m) => String(m.fechaPago || '').slice(0, 7)).filter((x) => /^\d{4}-\d{2}$/.test(x))
+  if (!meses.length) return null
+  const mes = meses.sort().at(-1)
+  const delMes = mats.filter((m) => String(m.fechaPago || '').slice(0, 7) === mes)
+  const porSegmento = {}
+  for (const s of cfg.segmentos) porSegmento[s.id] = delMes.filter((m) => m.seg === s.id).length
+  return { mes, total: delMes.length, porSegmento }
 }
 
 // Cálculo central sobre subconjuntos de leads/matrículas ya mapeados.
