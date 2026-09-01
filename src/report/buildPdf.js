@@ -97,19 +97,29 @@ function slideFunnel(ctx) {
   const pasos = pasosFunnel(data.funnel) // {label, val, conv, base}
   const areaX = M, areaW = 172, cx = areaX + areaW / 2
   const max = Math.max(...pasos.map((p) => p.val), 1)
-  const bw = (v) => (0.34 + 0.66 * (v / max)) * areaW
-  const bandH = 13, gap = 10
+  const bw = (v) => (0.32 + 0.68 * (v / max)) * areaW
+  const bandH = 13, gap = 11
+  const light = acc.map((c) => Math.round(c + (255 - c) * 0.55)) // acento aclarado para el cuello
   let y = 36
-  pasos.forEach((p) => {
+  pasos.forEach((p, i) => {
     const w = bw(p.val), x = cx - w / 2
+    // cuello (trapecio) que une con la banda anterior → efecto embudo
+    if (i > 0) {
+      const pw = bw(pasos[i - 1].val), py = y - gap - bandH
+      const ax = cx - pw / 2, bx = cx + pw / 2, y1 = py + bandH
+      const dx = cx - w / 2, ex = cx + w / 2, y2 = y
+      doc.setFillColor(...light)
+      doc.triangle(ax, y1, bx, y1, ex, y2, 'F')
+      doc.triangle(ax, y1, ex, y2, dx, y2, 'F')
+    }
     doc.setFillColor(...acc); doc.roundedRect(x, y, w, bandH, 2, 2, 'F')
     doc.setTextColor(...WHITE); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5)
     doc.text(p.label.toUpperCase(), x + 4, y + bandH / 2 + 2.4)
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12)
     doc.text(n0(p.val), x + w - 4, y + bandH / 2 + 3, { align: 'right' })
     if (p.conv != null) {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...MUTED)
-      doc.text(`↓  ${pct(p.conv)} ${p.base}`, cx, y + bandH + gap / 2 + 1.5, { align: 'center' })
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MUTED)
+      doc.text(`${pct(p.conv, 1)} ${p.base}`, cx, y - gap + gap / 2 + 1, { align: 'center' })
     }
     y += bandH + gap
   })

@@ -87,32 +87,47 @@ async function portada(pptx, cfg, data) {
 function slideFunnel(pptx, cfg, data, acc) {
   const s = pptx.addSlide()
   barraMarca(s); tituloSlide(s, 'Funnel de conversión')
-  const pasos = pasosFunnel(data.funnel) // {label, val, conv, base, w}
-  const areaX = 0.6, areaW = 7.4, cx = areaX + areaW / 2
+  const pasos = pasosFunnel(data.funnel) // {label, val, conv, base}
+  const areaX = 0.7, areaW = 7.0, cx = areaX + areaW / 2
   const max = Math.max(...pasos.map((p) => p.val), 1)
-  const bandH = 0.6, gap = 0.42
-  const bw = (v) => (0.34 + 0.66 * (v / max)) * areaW
-  let y = 1.8
-  pasos.forEach((p) => {
+  const bandH = 0.66, gap = 0.34
+  const bw = (v) => (0.32 + 0.68 * (v / max)) * areaW
+  const light = lightenHex(acc, 0.35)
+  let y = 1.75
+  pasos.forEach((p, i) => {
     const w = bw(p.val), x = cx - w / 2
-    s.addShape('roundRect', { x, y, w, h: bandH, rectRadius: 0.05, fill: { color: acc } })
-    s.addText(p.label.toUpperCase(), { x: x + 0.14, y, w: w - 0.28, h: bandH, align: 'left', valign: 'middle', fontSize: 8.5, color: 'FFFFFF' })
-    s.addText(n0(p.val), { x: x + 0.14, y, w: w - 0.28, h: bandH, align: 'right', valign: 'middle', fontSize: 14, bold: true, color: 'FFFFFF' })
-    if (p.conv != null) s.addText(`↓  ${pct(p.conv)} ${p.base}`, { x: areaX, y: y + bandH - 0.02, w: areaW, h: gap, align: 'center', valign: 'middle', fontSize: 9, color: MUTED })
+    // cuello (conector) hacia la banda anterior
+    if (i > 0) {
+      const pw = bw(pasos[i - 1].val), px = cx - pw / 2
+      const nw = Math.min(pw, w) * 0.5
+      s.addShape('rect', { x: cx - nw / 2, y: y - gap, w: nw, h: gap + 0.02, fill: { color: light } })
+    }
+    s.addShape('roundRect', { x, y, w, h: bandH, rectRadius: 0.06, fill: { color: acc } })
+    s.addText(p.label.toUpperCase(), { x: x + 0.16, y: y + 0.05, w: w - 0.32, h: 0.26, align: 'left', valign: 'top', fontSize: 8, color: 'FFFFFF' })
+    s.addText(n0(p.val), { x: x + 0.16, y: y + 0.2, w: w - 0.32, h: 0.42, align: 'center', valign: 'middle', fontSize: 17, bold: true, color: 'FFFFFF' })
+    if (p.conv != null) s.addText(`${pct(p.conv, 1)} ${p.base}`, { x: areaX, y: y - gap, w: areaW, h: gap, align: 'center', valign: 'middle', fontSize: 8.5, color: MUTED })
     y += bandH + gap
   })
   // Segmentos (tarjetas)
-  let sx = 8.9
+  let sx = 8.85
   data.segmentos.forEach((seg) => {
-    s.addText(seg.nombre, { x: sx, y: 1.8, w: 2.0, h: 0.42, align: 'center', valign: 'middle', fontSize: 13, bold: true, color: WHITE, fill: { color: acc } })
+    s.addText(seg.nombre, { x: sx, y: 1.75, w: 2.05, h: 0.42, align: 'center', valign: 'middle', fontSize: 13, bold: true, color: WHITE, fill: { color: acc } })
     const rows = [['Leads', n0(seg.leads)], ['Contacto', pct(seg.contactoPct, 0)], ['Potenciales', n0(seg.potenciales)], ['Matriculados', n0(seg.matriculados)]]
     s.addTable(rows.map((r, i) => [
       { text: r[0], options: { color: MUTED, fill: { color: i % 2 ? ZEBRA : WHITE } } },
       { text: r[1], options: { align: 'right', bold: true, fill: { color: i % 2 ? ZEBRA : WHITE } } },
-    ]), { x: sx, y: 2.22, w: 2.0, fontSize: 11, border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.4 })
+    ]), { x: sx, y: 2.17, w: 2.05, fontSize: 11, border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.4 })
     sx += 2.25
   })
-  if (f.notas?.length) s.addText(f.notas.join(' · '), { x: 0.6, y: 6.7, w: 8, h: 0.4, fontSize: 11, italic: true, color: MUTED })
+  const notas = data.funnel.notas
+  if (notas?.length) s.addText(notas.join(' · '), { x: 0.7, y: 6.95, w: 8, h: 0.35, fontSize: 10, italic: true, color: MUTED })
+}
+
+function lightenHex(hex, amt) {
+  const n = parseInt(String(hex).replace('#', ''), 16)
+  let r = n >> 16, g = (n >> 8) & 255, b = n & 255
+  r = Math.round(r + (255 - r) * amt); g = Math.round(g + (255 - g) * amt); b = Math.round(b + (255 - b) * amt)
+  return ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()
 }
 
 function tablaPrograma(rows, acc) {
