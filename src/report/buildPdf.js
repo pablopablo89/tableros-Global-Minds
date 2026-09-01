@@ -97,10 +97,10 @@ function slideFunnel(ctx) {
   const pasos = pasosFunnel(data.funnel) // {label, val, conv, base}
   const areaX = M, areaW = 172, cx = areaX + areaW / 2
   const max = Math.max(...pasos.map((p) => p.val), 1)
-  const bw = (v) => (0.32 + 0.68 * (v / max)) * areaW
-  const bandH = 13, gap = 11
+  const bw = (v) => (0.30 + 0.70 * (v / max)) * areaW
+  const bandH = 18, gap = 16.5
   const light = acc.map((c) => Math.round(c + (255 - c) * 0.55)) // acento aclarado para el cuello
-  let y = 36
+  let y = 44
   pasos.forEach((p, i) => {
     const w = bw(p.val), x = cx - w / 2
     // cuello (trapecio) que une con la banda anterior → efecto embudo
@@ -112,14 +112,14 @@ function slideFunnel(ctx) {
       doc.triangle(ax, y1, bx, y1, ex, y2, 'F')
       doc.triangle(ax, y1, ex, y2, dx, y2, 'F')
     }
-    doc.setFillColor(...acc); doc.roundedRect(x, y, w, bandH, 2, 2, 'F')
-    doc.setTextColor(...WHITE); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5)
-    doc.text(p.label.toUpperCase(), x + 4, y + bandH / 2 + 2.4)
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(12)
-    doc.text(n0(p.val), x + w - 4, y + bandH / 2 + 3, { align: 'right' })
+    doc.setFillColor(...acc); doc.roundedRect(x, y, w, bandH, 2.5, 2.5, 'F')
+    doc.setTextColor(...WHITE); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5)
+    doc.text(p.label.toUpperCase(), x + 6, y + bandH / 2 + 3)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15)
+    doc.text(n0(p.val), x + w - 6, y + bandH / 2 + 3.5, { align: 'right' })
     if (p.conv != null) {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(...MUTED)
-      doc.text(`${pct(p.conv, 1)} ${p.base}`, cx, y - gap + gap / 2 + 1, { align: 'center' })
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...MUTED)
+      doc.text(`${pct(p.conv, 1)} ${p.base}`, cx, y - gap / 2 + 1.5, { align: 'center' })
     }
     y += bandH + gap
   })
@@ -207,25 +207,42 @@ function slideMotivos(ctx) {
   })
 }
 
+function meterPanel(doc, x, y, w, h, acc, titulo, real, meta) {
+  doc.setFillColor(247, 248, 251); doc.setDrawColor(...LINE); doc.roundedRect(x, y, w, h, 3, 3, 'FD')
+  doc.setTextColor(...MUTED); doc.setFont('helvetica', 'normal'); doc.setFontSize(11)
+  doc.text(titulo, x + 10, y + 13)
+  const hayMeta = meta != null && meta > 0
+  const av = hayMeta ? (real / meta) * 100 : null
+  doc.setTextColor(14, 17, 22); doc.setFont('helvetica', 'bold'); doc.setFontSize(26)
+  doc.text(n0(real) + (hayMeta ? '  /  ' + n0(meta) : ''), x + 10, y + 32)
+  if (hayMeta) { doc.setTextColor(...acc); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(pct(av, 0) + ' de la meta', x + w - 10, y + 32, { align: 'right' }) }
+  else { doc.setTextColor(...MUTED); doc.setFont('helvetica', 'italic'); doc.setFontSize(10); doc.text('objetivo pendiente', x + w - 10, y + 32, { align: 'right' }) }
+  // barra de progreso
+  const bx = x + 10, by = y + h - 16, bw = w - 20, bh = 7
+  doc.setFillColor(230, 232, 238); doc.roundedRect(bx, by, bw, bh, 2, 2, 'F')
+  if (hayMeta) { doc.setFillColor(...acc); doc.roundedRect(bx, by, Math.max(2, bw * Math.min(100, av) / 100), bh, 2, 2, 'F') }
+}
+
+function statCard(doc, x, y, w, h, acc, lbl, val, sub) {
+  doc.setFillColor(247, 248, 251); doc.setDrawColor(...LINE); doc.roundedRect(x, y, w, h, 3, 3, 'FD')
+  doc.setTextColor(91, 100, 114); doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(lbl, x + w / 2, y + 12, { align: 'center' })
+  doc.setTextColor(14, 17, 22); doc.setFont('helvetica', 'bold'); doc.setFontSize(19); doc.text(String(val), x + w / 2, y + 26, { align: 'center' })
+  if (sub) { doc.setTextColor(...acc); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(sub, x + w / 2, y + h - 6, { align: 'center' }) }
+}
+
 function slideObjetivos(ctx) {
   const { doc, acc, cfg, data } = ctx
   titulo(ctx, 'Inversión y matrículas vs objetivo')
   const m = data.metas || {}, leads = m.leads || {}, mat = m.matriculas || {}
   const v = m.inversionVentana
   const cpl = leads.inversion && v?.leads ? leads.inversion / v.leads : null
-  const kpis = [
-    ['Leads', `${n0(leads.real)}${leads.meta ? ` / ${n0(leads.meta)}` : ''}`, leads.meta ? `${pct((leads.real / leads.meta) * 100, 0)} de la meta` : 'objetivo pendiente'],
-    ['Inversión (ads)', money(leads.inversion, cfg.moneda), cpl ? `CPL ${money(cpl, cfg.moneda)}` : ''],
-    ['Matrículas', `${n0(mat.real)}${mat.meta ? ` / ${n0(mat.meta)}` : ''}`, mat.meta ? `${pct((mat.real / mat.meta) * 100, 0)} de la meta` : 'objetivo pendiente'],
-    ['Acumulado ciclo', n0(mat.acumulado), ''],
-  ]
-  let x = M
-  const cw = 62, cy = 40, ch = 42
-  kpis.forEach(([lbl, val, sub]) => {
-    doc.setFillColor(247, 248, 251); doc.setDrawColor(...LINE); doc.roundedRect(x, cy, cw, ch, 2, 2, 'FD')
-    doc.setTextColor(...MUTED); doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(lbl, x + cw / 2, cy + 9, { align: 'center' })
-    doc.setTextColor(...INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(String(val), x + cw / 2, cy + 22, { align: 'center' })
-    if (sub) { doc.setTextColor(...acc); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(sub, x + cw / 2, cy + 32, { align: 'center' }) }
-    x += cw + 6
-  })
+  // dos paneles grandes con barra
+  const gy = 50, ph = 66, gap = 12, pw = (W - 2 * M - gap) / 2
+  meterPanel(doc, M, gy, pw, ph, acc, 'Leads vs objetivo', leads.real, leads.meta)
+  meterPanel(doc, M + pw + gap, gy, pw, ph, acc, 'Matrículas vs objetivo', mat.real, mat.meta)
+  // fila de stats
+  const sy = gy + ph + 16, sh = 50, sw = (W - 2 * M - 2 * gap) / 3
+  statCard(doc, M, sy, sw, sh, acc, 'Inversión en ads', money(leads.inversion, cfg.moneda), v ? `${v.dias} días: ${v.desde} → ${v.hasta}` : '')
+  statCard(doc, M + sw + gap, sy, sw, sh, acc, 'Costo por lead (CPL)', cpl ? money(cpl, cfg.moneda) : '—', 'en la ventana con gasto')
+  statCard(doc, M + 2 * (sw + gap), sy, sw, sh, acc, 'Acumulado del ciclo', n0(mat.acumulado), 'matrículas totales')
 }

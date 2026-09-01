@@ -90,10 +90,10 @@ function slideFunnel(pptx, cfg, data, acc) {
   const pasos = pasosFunnel(data.funnel) // {label, val, conv, base}
   const areaX = 0.7, areaW = 7.0, cx = areaX + areaW / 2
   const max = Math.max(...pasos.map((p) => p.val), 1)
-  const bandH = 0.66, gap = 0.34
-  const bw = (v) => (0.32 + 0.68 * (v / max)) * areaW
+  const bandH = 0.76, gap = 0.44
+  const bw = (v) => (0.30 + 0.70 * (v / max)) * areaW
   const light = lightenHex(acc, 0.35)
-  let y = 1.75
+  let y = 1.7
   pasos.forEach((p, i) => {
     const w = bw(p.val), x = cx - w / 2
     // cuello (conector) hacia la banda anterior
@@ -211,25 +211,37 @@ function slideMotivos(pptx, cfg, data, acc) {
   s.addTable(tRows, { x: 3.6, y: ty, w: 4, colW: [2, 2], border: { type: 'solid', color: LINE, pt: 0.5 }, rowH: 0.3 })
 }
 
+function meterPanelP(s, x, y, w, h, acc, titulo, real, meta) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.06, fill: { color: 'F7F8FB' }, line: { color: LINE, pt: 1 } })
+  s.addText(titulo, { x: x + 0.25, y: y + 0.2, w: w - 0.5, h: 0.35, align: 'left', valign: 'middle', fontSize: 13, color: MUTED })
+  const hayMeta = meta != null && meta > 0
+  const av = hayMeta ? (real / meta) * 100 : null
+  s.addText(n0(real) + (hayMeta ? '  /  ' + n0(meta) : ''), { x: x + 0.25, y: y + 0.55, w: w - 0.5, h: 0.7, align: 'left', valign: 'middle', fontSize: 28, bold: true, color: INK })
+  s.addText(hayMeta ? pct(av, 0) + ' de la meta' : 'objetivo pendiente', { x: x + 0.25, y: y + 0.55, w: w - 0.5, h: 0.7, align: 'right', valign: 'middle', fontSize: 13, bold: hayMeta, italic: !hayMeta, color: hayMeta ? acc : MUTED })
+  // barra
+  const bx = x + 0.25, by = y + h - 0.5, bw = w - 0.5, bh = 0.2
+  s.addShape('roundRect', { x: bx, y: by, w: bw, h: bh, rectRadius: 0.03, fill: { color: 'E6E8EE' }, line: { type: 'none' } })
+  if (hayMeta) s.addShape('roundRect', { x: bx, y: by, w: Math.max(0.1, bw * Math.min(100, av) / 100), h: bh, rectRadius: 0.03, fill: { color: acc }, line: { type: 'none' } })
+}
+
+function statCardP(s, x, y, w, h, acc, lbl, val, sub) {
+  s.addShape('roundRect', { x, y, w, h, rectRadius: 0.06, fill: { color: 'F7F8FB' }, line: { color: LINE, pt: 1 } })
+  s.addText(lbl, { x, y: y + 0.25, w, h: 0.35, align: 'center', fontSize: 12, color: MUTED })
+  s.addText(String(val), { x, y: y + 0.65, w, h: 0.6, align: 'center', valign: 'middle', fontSize: 22, bold: true, color: INK })
+  if (sub) s.addText(sub, { x, y: y + h - 0.45, w, h: 0.35, align: 'center', fontSize: 10, color: acc })
+}
+
 function slideObjetivos(pptx, cfg, data, acc) {
   const s = pptx.addSlide()
   barraMarca(s); tituloSlide(s, 'Inversión y matrículas vs objetivo')
-  const m = data.metas || {}
-  const leads = m.leads || {}, mat = m.matriculas || {}
-  const cpl = leads.inversion && leads.real ? leads.inversion / leads.real : null
-  const kpis = [
-    ['Leads', `${n0(leads.real)} / ${n0(leads.meta)}`, leads.meta ? pct((leads.real / leads.meta) * 100, 0) + ' de la meta' : ''],
-    ['Inversión', money(leads.inversion, cfg.moneda), cpl ? `CPL ${money(cpl, cfg.moneda)}` : ''],
-    ['Matrículas', `${n0(mat.real)} / ${n0(mat.meta)}`, mat.meta ? pct((mat.real / mat.meta) * 100, 0) + ' de la meta' : ''],
-    ['Acumulado ciclo', n0(mat.acumulado), ''],
-  ]
-  let x = 0.6
-  kpis.forEach(([lbl, val, sub]) => {
-    s.addShape('roundRect', { x, y: 2.2, w: 2.9, h: 2, rectRadius: 0.08, fill: { color: 'F7F8FB' }, line: { color: LINE, pt: 1 } })
-    s.addText(lbl, { x, y: 2.4, w: 2.9, h: 0.4, align: 'center', fontSize: 12, color: MUTED })
-    s.addText(val, { x, y: 2.9, w: 2.9, h: 0.6, align: 'center', fontSize: 22, bold: true, color: INK })
-    if (sub) s.addText(sub, { x, y: 3.6, w: 2.9, h: 0.4, align: 'center', fontSize: 11, color: acc })
-    x += 3.05
-  })
-  if (leads.demo || mat.demo) s.addText('* Valores demo — pendiente de conectar objetivos/inversión reales de la API.', { x: 0.6, y: 6.6, w: 11, h: 0.4, fontSize: 10, italic: true, color: MUTED })
+  const m = data.metas || {}, leads = m.leads || {}, mat = m.matriculas || {}
+  const v = m.inversionVentana
+  const cpl = leads.inversion && v?.leads ? leads.inversion / v.leads : null
+  const gap = 0.35, pw = (13.333 - 2 * 0.6 - gap) / 2
+  meterPanelP(s, 0.6, 1.9, pw, 1.9, acc, 'Leads vs objetivo', leads.real, leads.meta)
+  meterPanelP(s, 0.6 + pw + gap, 1.9, pw, 1.9, acc, 'Matrículas vs objetivo', mat.real, mat.meta)
+  const sy = 4.2, sh = 1.7, sw = (13.333 - 2 * 0.6 - 2 * gap) / 3
+  statCardP(s, 0.6, sy, sw, sh, acc, 'Inversión en ads', money(leads.inversion, cfg.moneda), v ? `${v.dias} días con gasto` : '')
+  statCardP(s, 0.6 + sw + gap, sy, sw, sh, acc, 'Costo por lead (CPL)', cpl ? money(cpl, cfg.moneda) : '—', 'en la ventana con gasto')
+  statCardP(s, 0.6 + 2 * (sw + gap), sy, sw, sh, acc, 'Acumulado del ciclo', n0(mat.acumulado), 'matrículas totales')
 }
