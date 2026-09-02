@@ -2,14 +2,12 @@
 // Puro y sin dependencias → se usa en la agregación (Node) y en el navegador.
 //
 // Macro-categorías, pensadas como un mercadólogo:
-//   • pauta    → hay dinero detrás. Incluye paid_social / cpc / paid Y los
-//                FORMULARIOS NATIVOS de Meta (medium=nativo): leads de campañas
-//                pagas cargados por el lead-form instantáneo. Confirmado por el
-//                usuario: "las bases cargadas (nativo) son de pauta".
+//   • pauta    → hay dinero detrás. Incluye paid_social / cpc / paid, los
+//                FORMULARIOS NATIVOS de Meta (medium=nativo) y las cargas
+//                manuales (source "alta manual"): todo eso proviene de campañas
+//                pagas (confirmado por el usuario). No es alcance orgánico.
 //   • organico → alcance GANADO sin pauta: social orgánico, búsqueda orgánica,
 //                directo, referral de sitios, email/CRM propio, eventos.
-//   • manual   → contactos cargados a mano (source "alta manual"): equipo comercial,
-//                eventos, referidos. Ni pauta ni alcance orgánico digital.
 //   • sin      → sin señal de origen (source y medium vacíos o basura).
 
 const lc = (s) => String(s == null ? '' : s).toLowerCase().trim()
@@ -27,8 +25,8 @@ export function clasificarCanal(source, medium) {
   if (m === 'nativo' || m === 'form nativo' || m === 'carga nativa' || m === 'navito')
     return { macro: 'pauta', canal: 'Formulario nativo' }
 
-  // 3) Carga manual (contactos cargados a mano; ni pauta ni orgánico digital).
-  if (s === 'alta manual' || m === 'carga manual') return { macro: 'manual', canal: 'Carga manual' }
+  // 3) Carga manual → pauta (también proviene de campañas pagas).
+  if (s === 'alta manual' || m === 'carga manual') return { macro: 'pauta', canal: 'Carga manual' }
 
   // 4) Orgánico: alcance ganado, sin pauta.
   if (/instagram|facebook|(^| )fb($| )|(^| )ig($| )|linkedin|l\.facebook|m\.facebook|lm\.facebook/.test(s))
@@ -65,12 +63,11 @@ export function fuenteLabel(source, medium) {
   return source // valor original si no lo conocemos
 }
 
-export const MACROS = ['organico', 'pauta', 'manual', 'sin']
-export const MACRO_LABEL = { organico: 'Orgánico', pauta: 'Pauta (Ads)', manual: 'Carga manual', sin: 'Sin clasificar' }
-export const MACRO_COLOR = { organico: '#2E9E6B', pauta: '#6A2AC0', manual: '#97A0AF', sin: '#CBD2DC' }
+export const MACROS = ['organico', 'pauta', 'sin']
+export const MACRO_LABEL = { organico: 'Orgánico', pauta: 'Pauta (Ads)', sin: 'Sin clasificar' }
+export const MACRO_COLOR = { organico: '#2E9E6B', pauta: '#6A2AC0', sin: '#CBD2DC' }
 export const MACRO_DESC = {
   organico: 'Alcance ganado sin pauta (social orgánico, búsqueda, directo, referral, email, eventos).',
-  pauta: 'Campañas pagas: Meta Ads y Google Ads, incluidos los formularios nativos (paid_social, cpc, paid, nativo).',
-  manual: 'Contactos cargados a mano (alta manual): equipo comercial, eventos, referidos.',
+  pauta: 'Campañas pagas: Meta Ads y Google Ads, incluidos formularios nativos y cargas manuales (paid_social, cpc, paid, nativo, alta manual).',
   sin: 'Leads sin señal de origen (source y medium vacíos).',
 }

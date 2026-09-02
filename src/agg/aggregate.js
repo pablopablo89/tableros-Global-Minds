@@ -159,8 +159,8 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
 // compara eficiencia (conversión lead→matrícula) y desglosa el orgánico por canal,
 // fuente, segmento, programa, ciudad y mes.
 function construirOrganico(leads, mats, cfg) {
-  const MAC = ['organico', 'pauta', 'manual', 'sin']
-  const LBL = { organico: 'Orgánico', pauta: 'Pauta (Ads)', manual: 'Carga manual', sin: 'Sin clasificar' }
+  const MAC = ['organico', 'pauta', 'sin']
+  const LBL = { organico: 'Orgánico', pauta: 'Pauta (Ads)', sin: 'Sin clasificar' }
   const totalLeads = leads.length, totalMats = mats.length
 
   const macros = MAC.map((mm) => {
@@ -235,7 +235,7 @@ function construirOrganico(leads, mats, cfg) {
   const cv = (mm) => macros.find((x) => x.macro === mm)?.convPct || 0
   return {
     totalLeads, totalMats, macros, canales, fuentes, programas, segmentos, ciudades, mensual,
-    conv: { organico: cv('organico'), pauta: cv('pauta'), manual: cv('manual') },
+    conv: { organico: cv('organico'), pauta: cv('pauta') },
   }
 }
 
