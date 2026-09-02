@@ -97,6 +97,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
       ciudad: norm(l.ciudad),
       fecha: l.fecha_insercion || l.ts,
       macro: ch.macro, canal: ch.canal, fuente: fuenteLabel(l.utm_source, l.utm_medium),
+      srcRaw: norm(l.utm_source), medRaw: norm(l.utm_medium),
     }
   })
 
@@ -117,6 +118,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
       fechaPago: m.fecha_de_pago,
       precio: money(m.precio_con_descuento) || money(m.precio_full),
       macro: ch.macro, canal: ch.canal, fuente: fuenteLabel(src, med),
+      srcRaw: norm(src), medRaw: norm(med),
     }
   })
 
@@ -194,7 +196,7 @@ function construirOrganico(leads, mats, cfg) {
   const fRow = (k) => { if (!fMap.has(k)) fMap.set(k, { fuente: k, leads: 0, matriculados: 0 }); return fMap.get(k) }
   for (const l of orgL) fRow(l.fuente).leads++
   for (const m of orgM) fRow(m.fuente).matriculados++
-  const fuentes = [...fMap.values()].sort((a, b) => (b.leads + b.matriculados * 20) - (a.leads + a.matriculados * 20))
+  const fuentes = [...fMap.values()].sort((a, b) => b.leads - a.leads || b.matriculados - a.matriculados)
 
   // Programas con más orgánico (consolidando el mismo nombre escrito distinto).
   const pMap = new Map()
@@ -232,9 +234,20 @@ function construirOrganico(leads, mats, cfg) {
   for (const m of orgM) if (enCiclo(m.fechaPago)) mRow(mesDe(m.fechaPago)).matriculados++
   const mensual = [...mMap.values()].filter((x) => /^\d{4}-\d{2}$/.test(x.mes)).sort((a, b) => a.mes.localeCompare(b.mes))
 
+  // Detalle del bucket "Sin clasificar": qué combinaciones crudas de source/medium
+  // lo componen (para explicar de qué se trata en el tablero).
+  const sinL = leads.filter((l) => l.macro === 'sin')
+  const sinMats = mats.filter((m) => m.macro === 'sin')
+  const dMap = new Map()
+  const etiqueta = (v) => (v && v.toLowerCase() !== '(null)' && v.toLowerCase() !== 'null' ? v : '∅ (vacío)')
+  const dRow = (k) => { if (!dMap.has(k)) dMap.set(k, { combo: k, leads: 0, matriculados: 0 }); return dMap.get(k) }
+  for (const l of sinL) dRow(`${etiqueta(l.srcRaw)}  ·  ${etiqueta(l.medRaw)}`).leads++
+  for (const m of sinMats) dRow(`${etiqueta(m.srcRaw)}  ·  ${etiqueta(m.medRaw)}`).matriculados++
+  const sinDetalle = [...dMap.values()].sort((a, b) => b.leads - a.leads).slice(0, 8)
+
   const cv = (mm) => macros.find((x) => x.macro === mm)?.convPct || 0
   return {
-    totalLeads, totalMats, macros, canales, fuentes, programas, segmentos, ciudades, mensual,
+    totalLeads, totalMats, macros, canales, fuentes, programas, segmentos, ciudades, mensual, sinDetalle,
     conv: { organico: cv('organico'), pauta: cv('pauta') },
   }
 }
@@ -253,7 +266,7 @@ function construirMensual(leads, mats, cfg) {
 
   return [...meses.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([mes, { leads: ls, mats: ms }]) => ({ mes, ...nucleo(ls, ms, cfg) }))
+    .map(([mes, { leads: ls, mats: ms }]) => ({ mes, ...nucleo(ls, ms, cfg), organico: construirOrganico(ls, ms, cfg) }))
 }
 
 // Matrículas del mes más reciente con ventas (mes en curso), por segmento.
@@ -353,7 +366,7 @@ function construirSemanal(leads, mats, cfg) {
     .sort((a, b) => b[0].localeCompare(a[0])) // más reciente primero
     .map(([semana, { leads: ls, mats: ms }]) => {
       const fin = new Date(semana + 'T00:00:00'); fin.setDate(fin.getDate() + 6)
-      return { semana, fin: fin.toISOString().slice(0, 10), ...nucleo(ls, ms, cfg) }
+      return { semana, fin: fin.toISOString().slice(0, 10), ...nucleo(ls, ms, cfg), organico: construirOrganico(ls, ms, cfg) }
     })
 }
 

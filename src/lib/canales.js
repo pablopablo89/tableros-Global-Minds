@@ -33,30 +33,37 @@ export function clasificarCanal(source, medium) {
     return { macro: 'organico', canal: 'Social orgánico' }
   if (/google|bing/.test(s) && /organic/.test(m)) return { macro: 'organico', canal: 'Búsqueda orgánica' }
   if (s === '(direct)' || (!s && /none|direct/.test(m))) return { macro: 'organico', canal: 'Directo' }
-  if (/referral/.test(m) || /chatgpt|teams|onecdn|microsoft/.test(s)) return { macro: 'organico', canal: 'Referral / sitios' }
-  if (/mail|correo|alumni/.test(s + ' ' + m)) return { macro: 'organico', canal: 'Email / CRM' }
+  if (/mail|correo|alumni|doppler|mailing/.test(s + ' ' + m)) return { macro: 'organico', canal: 'Email / CRM' }
   if (/evento|aeropuerto|offline|countdown/.test(s + ' ' + m)) return { macro: 'organico', canal: 'Eventos / offline' }
+  // Sitio propio (ofertaacademica, dominios .edu, "sitio-…") y otros referrers = orgánico.
+  if (/referral/.test(m) || /sitio-|\.edu|ofertaacademica/.test(s + ' ' + m) || /chatgpt|copilot|teams|onecdn|microsoft/.test(s))
+    return { macro: 'organico', canal: 'Referral / sitios' }
 
   // 5) Sin clasificar.
   return { macro: 'sin', canal: 'Sin clasificar' }
 }
 
 // Etiqueta legible de la FUENTE cruda (para el desglose "de dónde viene el orgánico").
+// Consolida variantes por patrón (linkedin.com, com.linkedin.android → LinkedIn, etc.).
 export function fuenteLabel(source, medium) {
-  const s = lc(source)
-  const map = {
-    'instagram.com': 'Instagram', 'instagram': 'Instagram', 'ig': 'Instagram',
-    'facebook.com': 'Facebook', 'm.facebook.com': 'Facebook', 'l.facebook.com': 'Facebook',
-    'lm.facebook.com': 'Facebook', 'fb': 'Facebook', 'fb-sitelink': 'Facebook',
-    'google': 'Google', 'bing': 'Bing', 'linkedin': 'LinkedIn',
-    'chatgpt.com': 'ChatGPT', '(direct)': 'Directo', 'mail': 'Email',
-    'sitio-uees': 'Sitio UEES', 'uees.edu.ec': 'Sitio UEES', 'evento': 'Evento', 'offline': 'Offline',
-  }
-  if (map[s]) return map[s]
+  const s = lc(source), m = lc(medium)
+  if (/linkedin/.test(s)) return 'LinkedIn'
+  if (/instagram|(^| )ig($| )/.test(s)) return 'Instagram'
+  if (/facebook|(^| )fb/.test(s)) return 'Facebook'
+  if (/tagassistant|googlequicksearch|(^| )google/.test(s)) return 'Google'
+  if (/bing/.test(s)) return 'Bing'
+  if (/brave/.test(s)) return 'Brave'
+  if (/chatgpt|openai/.test(s)) return 'ChatGPT'
+  if (/copilot/.test(s)) return 'Copilot'
+  if (/teams|onecdn|microsoft/.test(s)) return 'Microsoft'
+  if (/whatsapp|(^| )wa($| )/.test(s + ' ' + m)) return 'WhatsApp'
+  if (/sitio-|\.edu|ofertaacademica/.test(s + ' ' + m)) return 'Sitio propio'
+  if (/evento|aeropuerto/.test(s + ' ' + m)) return 'Evento'
+  if (/offline|countdown/.test(s)) return 'Offline'
+  if (s === '(direct)') return 'Directo'
+  if (/mail|correo|alumni|doppler|mailing/.test(s + ' ' + m)) return 'Email'
   if (!s || s === '(null)' || s === 'null') {
-    const m = lc(medium)
     if (/direct|none/.test(m)) return 'Directo'
-    if (/mail|correo|alumni/.test(m)) return 'Email'
     if (/referral/.test(m)) return 'Referral'
     return '(sin fuente)'
   }

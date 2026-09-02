@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { n0, pct } from '../lib/format.js'
+import { useMemo, useState } from 'react'
+import { n0, pct, fechaCorta } from '../lib/format.js'
 import { MACRO_COLOR, MACRO_DESC } from '../lib/canales.js'
 import { consolidarProgramas } from '../lib/derive.js'
 
@@ -7,8 +7,35 @@ import { consolidarProgramas } from '../lib/derive.js'
 // GANADO sin pauta. Pensada como un mercadólogo: eficiencia por canal, de dónde
 // viene el orgánico, qué programas/ciudades trae y cómo evoluciona.
 export default function OrganicView({ cuenta, data, onBack }) {
-  const o = data?.organico
+  const [periodo, setPeriodo] = useState('todas')
+  const meses = data?.mensual || []
+  const semanas = data?.semanal || []
+  // El período elegido (M:<mes> o S:<lunes>) reemplaza el bloque orgánico por el
+  // corte guardado en el snapshot; "todas" usa el ciclo completo.
+  const o = useMemo(() => {
+    if (!data?.organico) return null
+    if (periodo === 'todas') return data.organico
+    if (periodo.startsWith('M:')) return (data.mensual || []).find((x) => x.mes === periodo.slice(2))?.organico || data.organico
+    return (data.semanal || []).find((x) => x.semana === periodo.replace(/^S:/, ''))?.organico || data.organico
+  }, [data, periodo])
+  const periodView = periodo !== 'todas'
   const ins = useMemo(() => (o ? insightsOrganicos(o, cuenta) : []), [o, cuenta])
+
+  const selector = (
+    <div className="field" style={{ marginTop: 12 }}>
+      <label>Período</label>
+      <select value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
+        <option value="todas">Todo el ciclo</option>
+        <optgroup label="Por mes">
+          {meses.map((m) => <option key={m.mes} value={'M:' + m.mes}>{mesLabel(m.mes)}</option>)}
+        </optgroup>
+        <optgroup label="Por semana (lun–dom)">
+          {semanas.map((s) => <option key={s.semana} value={'S:' + s.semana}>{fechaCorta(s.semana)} – {fechaCorta(s.fin)}</option>)}
+        </optgroup>
+      </select>
+    </div>
+  )
+
   if (!o) {
     return (
       <div>
@@ -23,7 +50,7 @@ export default function OrganicView({ cuenta, data, onBack }) {
   const vsRatio = pauta.convPct ? org.convPct / pauta.convPct : null
   const maxConv = Math.max(...o.macros.map((m) => m.convPct), 0.01)
   const canalMax = Math.max(...o.canales.map((c) => c.leads), 1)
-  const fuentesTop = topConOtros(o.fuentes, 8)
+  const fuentesTop = topConOtros(o.fuentes, 12)
   const fuenteMax = Math.max(...fuentesTop.map((f) => f.leads), 1)
   const progOrg = consolidarProgramas(
     o.programas.map((p) => ({ segmento: p.segmento, nombre: p.nombre, total: p.leads, matriculados: p.matriculados, gestionados: 0, noUtil: 0, potenciales: 0, cohorte: null })),
@@ -35,7 +62,13 @@ export default function OrganicView({ cuenta, data, onBack }) {
   // Tema verde para la página de orgánico.
   return (
     <div style={{ '--acc': '#2E9E6B', '--acc-soft': '#E7F4EE' }}>
-      <BackBar cuenta={cuenta} onBack={onBack} />
+      <BackBar cuenta={cuenta} onBack={onBack} selector={selector} />
+
+      {periodView && (
+        <div className="card" style={{ marginBottom: 16, borderColor: '#2E9E6B' }}>
+          <div className="card-b small">📅 Mostrando el <b>período seleccionado</b>. Elegí <b>“Todo el ciclo”</b> para volver a la vista completa.</div>
+        </div>
+      )}
 
       {/* Definición / advertencia metodológica */}
       <div className="card" style={{ marginBottom: 18, borderColor: '#2E9E6B' }}>
@@ -93,6 +126,28 @@ export default function OrganicView({ cuenta, data, onBack }) {
                 </span>
               ))}
             </div>
+
+            {/* Qué es "Sin clasificar" */}
+            {o.sinDetalle?.length > 0 && (
+              <details style={{ marginTop: 14, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--muted)' }}>
+                  ¿Qué es “Sin clasificar”?
+                </summary>
+                <p className="small faint" style={{ margin: '8px 0 10px', lineHeight: 1.5 }}>
+                  Leads a los que el sistema <b>no les registró origen</b> (source y medium vacíos o de prueba). No se puede saber si vinieron de pauta u orgánico, por eso quedan aparte. Estas son las combinaciones <code>source · medium</code> más frecuentes:
+                </p>
+                <div className="table-wrap">
+                  <table className="data">
+                    <thead><tr><th>source · medium</th><th>Leads</th><th>Matrículas</th></tr></thead>
+                    <tbody>
+                      {o.sinDetalle.map((d, i) => (
+                        <tr key={i}><td>{d.combo}</td><td>{n0(d.leads)}</td><td>{n0(d.matriculados)}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            )}
           </div>
         </div>
         <Insights items={ins} />
@@ -186,7 +241,7 @@ export default function OrganicView({ cuenta, data, onBack }) {
       </div>
 
       {/* Geografía + Evolución */}
-      <div className="grid cols-2" style={{ marginTop: 18 }}>
+      <div className="grid" style={{ marginTop: 18, gridTemplateColumns: periodView ? '1fr' : '1fr 1fr' }}>
         <div className="card">
           <div className="card-h"><h2>Geografía orgánica</h2><span className="hint">matrículas sin pauta</span></div>
           <div className="card-b">
@@ -202,7 +257,7 @@ export default function OrganicView({ cuenta, data, onBack }) {
             </div>
           </div>
         </div>
-        <div className="card">
+        {!periodView && <div className="card">
           <div className="card-h"><h2>Evolución mensual</h2><span className="hint">orgánico</span></div>
           <div className="card-b">
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${o.mensual.length || 1}, 1fr)`, gap: 8, alignItems: 'end', height: 150 }}>
@@ -222,13 +277,13 @@ export default function OrganicView({ cuenta, data, onBack }) {
               <span className="small" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: 'var(--acc)' }} /> Matrículas</span>
             </div>
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   )
 }
 
-function BackBar({ cuenta, onBack }) {
+function BackBar({ cuenta, onBack, selector }) {
   return (
     <div className="acct-head">
       <div>
@@ -236,6 +291,7 @@ function BackBar({ cuenta, onBack }) {
         <h1>🌱 Alcance orgánico</h1>
         <div className="sub">{cuenta.nombre} · adquisición sin pauta</div>
       </div>
+      {selector}
     </div>
   )
 }
@@ -285,6 +341,12 @@ function Insights({ items }) {
 const limpiar = (nombre) => String(nombre).replace(/^(Master|Diplomado|GMP|DIPLOMADO)\s*[-–]\s*/i, '').trim()
 function mesCorto(yyyymm) {
   try { return new Date(yyyymm + '-01T00:00:00').toLocaleDateString('es-ES', { month: 'short' }) } catch { return yyyymm }
+}
+function mesLabel(yyyymm) {
+  try {
+    const s = new Date(yyyymm + '-01T00:00:00').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  } catch { return yyyymm }
 }
 function topConOtros(arr, n) {
   if (arr.length <= n) return arr
