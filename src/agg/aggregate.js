@@ -1,6 +1,7 @@
 // Agregación NODS: convierte los endpoints crudos (matriculas, consulta_base,
 // objetivos, meta) en el modelo compacto del tablero. Puro, sin dependencias:
 // se usa igual en el generador de snapshots (Node) y en la función serverless.
+import { clasificarCanal, fuenteLabel } from '../lib/canales.js'
 
 // "No Útil" = MOTIVO terminal de no-compra. Lista blanca calibrada contra los
 // reportes de NODS (la columna "No Útil" = total de la tabla de motivos). Excluye
@@ -72,27 +73,52 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   const segIds = cfg.segmentos.map((s) => s.id)
   const idxSeg = (id) => cfg.segmentos.find((s) => s.id === id)
 
+  // Índice de leads por email/teléfono, para recuperar el canal de una matrícula
+  // cuyo UTM propio vino vacío (backfill desde el lead de origen). El email/teléfono
+  // NUNCA sale de esta función: sólo se usa para el join; el snapshot es agregado.
+  const nMail = (s) => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9@.]/g, '')
+  const nTel = (s) => String(s == null ? '' : s).replace(/\D/g, '').slice(-9)
+  const idxMail = new Map(), idxTel = new Map()
+  for (const l of consultaBase) {
+    const e = nMail(l.emlmail); if (e.includes('@')) idxMail.set(e, l)
+    for (const t of [nTel(l.teltelefono), nTel(l.telwhatsapp)]) if (t.length >= 7 && !idxTel.has(t)) idxTel.set(t, l)
+  }
+  const vacioCanal = (v) => { const x = norm(v).toLowerCase(); return x === '' || x === '(null)' || x === 'null' }
+
   // ---------- Leads (consulta_base) ----------
-  const leads = consultaBase.map((l) => ({
-    seg: segmentoDe(l.txtprogramainteres, cfg),
-    programa: norm(l.txtprogramainteres),
-    sub: norm(l.descripcion_sub),
-    gestionado: norm(l.gestionado_neotel) === 'S',
-    cohorte: cohorteLabel(l.descripcion_db),
-    ciudad: norm(l.ciudad),
-    fecha: l.fecha_insercion || l.ts,
-  }))
+  const leads = consultaBase.map((l) => {
+    const ch = clasificarCanal(l.utm_source, l.utm_medium)
+    return {
+      seg: segmentoDe(l.txtprogramainteres, cfg),
+      programa: norm(l.txtprogramainteres),
+      sub: norm(l.descripcion_sub),
+      gestionado: norm(l.gestionado_neotel) === 'S',
+      cohorte: cohorteLabel(l.descripcion_db),
+      ciudad: norm(l.ciudad),
+      fecha: l.fecha_insercion || l.ts,
+      macro: ch.macro, canal: ch.canal, fuente: fuenteLabel(l.utm_source, l.utm_medium),
+    }
+  })
 
   // ---------- Matrículas ----------
-  const mats = matriculas.map((m) => ({
-    seg: segmentoDe(m.programa, cfg),
-    programa: norm(m.programa),
-    tipo: norm(m.tipo_programa),
-    cohorte: cohorteLabel(m.cohorte),
-    ciudad: norm(m.ciudad),
-    fechaPago: m.fecha_de_pago,
-    precio: money(m.precio_con_descuento) || money(m.precio_full),
-  }))
+  const mats = matriculas.map((m) => {
+    let src = m.source, med = m.medium
+    if (vacioCanal(src) && vacioCanal(med)) {
+      const hit = idxMail.get(nMail(m.correo)) || idxTel.get(nTel(m.telefono))
+      if (hit) { src = hit.utm_source; med = hit.utm_medium }
+    }
+    const ch = clasificarCanal(src, med)
+    return {
+      seg: segmentoDe(m.programa, cfg),
+      programa: norm(m.programa),
+      tipo: norm(m.tipo_programa),
+      cohorte: cohorteLabel(m.cohorte),
+      ciudad: norm(m.ciudad),
+      fechaPago: m.fecha_de_pago,
+      precio: money(m.precio_con_descuento) || money(m.precio_full),
+      macro: ch.macro, canal: ch.canal, fuente: fuenteLabel(src, med),
+    }
+  })
 
   // ---------- Núcleo (funnel/segmentos/programas/ciudades/tipificaciones/ticket/ingresos) ----------
   const { funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos } = nucleo(leads, mats, cfg)
@@ -116,12 +142,100 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   // ---------- Ventas (matrículas) del mes en curso, por segmento ----------
   const ventasMes = construirVentasMes(mats, cfg)
 
+  // ---------- Alcance orgánico (canal de adquisición) ----------
+  const organico = construirOrganico(leads, mats, cfg)
+
   return {
     fechaCorte: new Date().toISOString().slice(0, 10),
     cuenta: cfg.id,
     moneda: cfg.moneda,
-    funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, metas, leadsSemana, daily, cohortes, semanal, mensual, ventasMes,
+    funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, metas, leadsSemana, daily, cohortes, semanal, mensual, ventasMes, organico,
     cobertura: { leads: leads.length, matriculas: mats.length },
+  }
+}
+
+// Analítica de canal de adquisición, con foco en el alcance ORGÁNICO.
+// Reparte leads y matrículas en macro-categorías (orgánico / pauta / bases / sin),
+// compara eficiencia (conversión lead→matrícula) y desglosa el orgánico por canal,
+// fuente, segmento, programa, ciudad y mes.
+function construirOrganico(leads, mats, cfg) {
+  const MAC = ['organico', 'pauta', 'base', 'sin']
+  const LBL = { organico: 'Orgánico', pauta: 'Pauta (Ads)', base: 'Bases cargadas', sin: 'Sin clasificar' }
+  const totalLeads = leads.length, totalMats = mats.length
+
+  const macros = MAC.map((mm) => {
+    const L = leads.filter((l) => l.macro === mm)
+    const M = mats.filter((m) => m.macro === mm)
+    const cont = L.filter((l) => esContactado(l.sub)).length
+    return {
+      macro: mm, label: LBL[mm], leads: L.length, matriculados: M.length,
+      convPct: L.length ? (M.length / L.length) * 100 : 0,
+      contactoPct: L.length ? (cont / L.length) * 100 : 0,
+      potenciales: L.filter((l) => POTENCIAL.has(l.sub)).length,
+      leadShare: totalLeads ? (L.length / totalLeads) * 100 : 0,
+      matShare: totalMats ? (M.length / totalMats) * 100 : 0,
+    }
+  })
+
+  const orgL = leads.filter((l) => l.macro === 'organico')
+  const orgM = mats.filter((m) => m.macro === 'organico')
+
+  // Canales orgánicos (sub-canales) con embudo.
+  const cMap = new Map()
+  const canalRow = (k) => { if (!cMap.has(k)) cMap.set(k, { canal: k, leads: 0, contacto: 0, potenciales: 0, matriculados: 0 }); return cMap.get(k) }
+  for (const l of orgL) { const r = canalRow(l.canal); r.leads++; if (esContactado(l.sub)) r.contacto++; if (POTENCIAL.has(l.sub)) r.potenciales++ }
+  for (const m of orgM) canalRow(m.canal).matriculados++
+  const canales = [...cMap.values()]
+    .map((c) => ({ ...c, contactoPct: c.leads ? (c.contacto / c.leads) * 100 : 0, convPct: c.leads ? (c.matriculados / c.leads) * 100 : 0 }))
+    .sort((a, b) => b.leads - a.leads)
+
+  // Fuentes orgánicas (de dónde viene, valor crudo agrupado).
+  const fMap = new Map()
+  const fRow = (k) => { if (!fMap.has(k)) fMap.set(k, { fuente: k, leads: 0, matriculados: 0 }); return fMap.get(k) }
+  for (const l of orgL) fRow(l.fuente).leads++
+  for (const m of orgM) fRow(m.fuente).matriculados++
+  const fuentes = [...fMap.values()].sort((a, b) => (b.leads + b.matriculados * 20) - (a.leads + a.matriculados * 20))
+
+  // Programas con más orgánico (consolidando el mismo nombre escrito distinto).
+  const pMap = new Map()
+  const pRow = (seg, nombre) => {
+    const k = `${seg}||${normKey(nombre)}`
+    if (!pMap.has(k)) pMap.set(k, { segmento: seg, nombre, leads: 0, matriculados: 0 })
+    return pMap.get(k)
+  }
+  for (const l of orgL) { if (l.seg) pRow(l.seg, l.programa).leads++ }
+  for (const m of orgM) { if (m.seg) pRow(m.seg, m.programa).matriculados++ }
+  const programas = [...pMap.values()]
+    .map((p) => ({ ...p, convPct: p.leads ? (p.matriculados / p.leads) * 100 : 0 }))
+    .sort((a, b) => b.matriculados - a.matriculados || b.leads - a.leads)
+
+  // Segmentos (orgánico).
+  const segmentos = cfg.segmentos.map((s) => {
+    const L = orgL.filter((l) => l.seg === s.id).length
+    const M = orgM.filter((m) => m.seg === s.id).length
+    return { id: s.id, nombre: s.nombre, leads: L, matriculados: M, convPct: L ? (M / L) * 100 : 0 }
+  })
+
+  // Ciudades (matrículas orgánicas).
+  const ciuMap = new Map()
+  for (const m of orgM) { const c = m.ciudad || 'Sin especificar'; ciuMap.set(c, (ciuMap.get(c) || 0) + 1) }
+  const ciudades = [...ciuMap.entries()].map(([ciudad, matriculados]) => ({ ciudad, matriculados })).sort((a, b) => b.matriculados - a.matriculados)
+
+  // Evolución mensual (orgánico) acotada al año del ciclo.
+  const anios = mats.map((m) => (String(m.fechaPago).match(/^(\d{4})/) || [])[1]).filter(Boolean)
+  const cycleYear = anios.length ? moda(anios) : String(new Date().getFullYear())
+  const enCiclo = (f) => f && String(f).slice(0, 4) === cycleYear
+  const mesDe = (f) => String(f).slice(0, 7)
+  const mMap = new Map()
+  const mRow = (k) => { if (!mMap.has(k)) mMap.set(k, { mes: k, leads: 0, matriculados: 0 }); return mMap.get(k) }
+  for (const l of orgL) if (enCiclo(l.fecha)) mRow(mesDe(l.fecha)).leads++
+  for (const m of orgM) if (enCiclo(m.fechaPago)) mRow(mesDe(m.fechaPago)).matriculados++
+  const mensual = [...mMap.values()].filter((x) => /^\d{4}-\d{2}$/.test(x.mes)).sort((a, b) => a.mes.localeCompare(b.mes))
+
+  const cv = (mm) => macros.find((x) => x.macro === mm)?.convPct || 0
+  return {
+    totalLeads, totalMats, macros, canales, fuentes, programas, segmentos, ciudades, mensual,
+    conv: { organico: cv('organico'), pauta: cv('pauta'), base: cv('base') },
   }
 }
 

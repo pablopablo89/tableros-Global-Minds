@@ -14,11 +14,13 @@ import Tipificaciones from './Tipificaciones.jsx'
 import Ticket from './Ticket.jsx'
 import DailyChart from './DailyChart.jsx'
 import ReportModal from '../report/ReportModal.jsx'
+import OrganicView from './OrganicView.jsx'
 
 export default function AccountView({ cuenta }) {
   const [filtros, setFiltros] = useState({})
   const [semanaSel, setSemanaSel] = useState('todas')
   const [showReport, setShowReport] = useState(false)
+  const [vista, setVista] = useState('tablero')
   const [refrescando, setRefrescando] = useState(false)
   const [msgRefresco, setMsgRefresco] = useState('')
 
@@ -75,6 +77,8 @@ export default function AccountView({ cuenta }) {
     setFiltros((f) => ({ ...f, fechaInicio: s.inicio.toISOString(), fechaFin: s.fin.toISOString() }))
   }
 
+  if (vista === 'organico') return <OrganicView cuenta={cuenta} data={data} onBack={() => setVista('tablero')} />
+
   return (
     <div>
       <div className="acct-head">
@@ -106,6 +110,7 @@ export default function AccountView({ cuenta }) {
           </select>
         </div>
         <div className="spacer" />
+        <button className="btn" onClick={() => setVista('organico')} disabled={!data} title="Alcance orgánico: adquisición sin pauta" style={{ borderColor: '#2E9E6B', color: '#227A52' }}>🌱 Alcance orgánico</button>
         <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)">{refrescando ? '⏳ Actualizando…' : '⟳ Actualizar datos'}</button>
         <button className="btn primary" onClick={() => setShowReport(true)} disabled={!data}>Generar reporte</button>
       </div>
