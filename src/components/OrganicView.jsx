@@ -22,7 +22,7 @@ export default function OrganicView({ cuenta, data, onBack }) {
   const ins = useMemo(() => (o ? insightsOrganicos(o, cuenta) : []), [o, cuenta])
 
   const selector = (
-    <div className="field" style={{ marginTop: 12 }}>
+    <div className="field">
       <label>Período</label>
       <select value={periodo} onChange={(e) => setPeriodo(e.target.value)}>
         <option value="todas">Todo el ciclo</option>
@@ -62,7 +62,12 @@ export default function OrganicView({ cuenta, data, onBack }) {
   // Tema verde para la página de orgánico.
   return (
     <div style={{ '--acc': '#2E9E6B', '--acc-soft': '#E7F4EE' }}>
-      <BackBar cuenta={cuenta} onBack={onBack} selector={selector} />
+      <BackBar cuenta={cuenta} onBack={onBack} />
+
+      <div className="toolbar">
+        {selector}
+        <div className="spacer" />
+      </div>
 
       {periodView && (
         <div className="card" style={{ marginBottom: 16, borderColor: '#2E9E6B' }}>
@@ -283,7 +288,7 @@ export default function OrganicView({ cuenta, data, onBack }) {
   )
 }
 
-function BackBar({ cuenta, onBack, selector }) {
+function BackBar({ cuenta, onBack }) {
   return (
     <div className="acct-head">
       <div>
@@ -291,7 +296,6 @@ function BackBar({ cuenta, onBack, selector }) {
         <h1>🌱 Alcance orgánico</h1>
         <div className="sub">{cuenta.nombre} · adquisición sin pauta</div>
       </div>
-      {selector}
     </div>
   )
 }
