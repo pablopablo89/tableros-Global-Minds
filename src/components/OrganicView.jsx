@@ -20,7 +20,6 @@ export default function OrganicView({ cuenta, data, onBack }) {
 
   const org = o.macros.find((m) => m.macro === 'organico') || {}
   const pauta = o.macros.find((m) => m.macro === 'pauta') || {}
-  const base = o.macros.find((m) => m.macro === 'base') || {}
   const vsRatio = pauta.convPct ? org.convPct / pauta.convPct : null
   const maxConv = Math.max(...o.macros.map((m) => m.convPct), 0.01)
   const canalMax = Math.max(...o.canales.map((c) => c.leads), 1)
@@ -43,8 +42,8 @@ export default function OrganicView({ cuenta, data, onBack }) {
         <div className="card-b small" style={{ lineHeight: 1.5 }}>
           🌱 <b>Alcance orgánico</b> = leads y matrículas ganados <b>sin pauta</b> (social orgánico, búsqueda, directo, referral, email y eventos).
           Clasificamos por <code>utm_source</code> / <code>utm_medium</code>; en las matrículas sin UTM propio recuperamos el canal desde el lead de origen.
-          <br />⚠️ <b>Ojo:</b> el <b>{pct(base.leadShare, 0)}</b> de los leads son <b>bases cargadas</b> (medium “nativo” / alta manual): listas propias o compradas,
-          <b> no</b> alcance orgánico. Las separamos para no inflar el dato.
+          <br />⚠️ <b>Ojo:</b> los <b>formularios nativos</b> de Meta (medium “nativo”) cuentan como <b>pauta</b>, no como orgánico: son leads de campañas pagas.
+          Por eso el orgánico es una porción chica de los leads… pero, como vas a ver, la más eficiente.
         </div>
       </div>
 
@@ -301,7 +300,6 @@ function insightsOrganicos(o, cfg) {
   const add = (tipo, score, texto) => C.push({ tipo, score, texto })
   const org = o.macros.find((m) => m.macro === 'organico') || {}
   const pauta = o.macros.find((m) => m.macro === 'pauta') || {}
-  const base = o.macros.find((m) => m.macro === 'base') || {}
 
   if (org.convPct && pauta.convPct) {
     const r = org.convPct / pauta.convPct
@@ -328,7 +326,7 @@ function insightsOrganicos(o, cfg) {
   const mejorSeg = [...o.segmentos].sort((a, b) => b.convPct - a.convPct)[0]
   if (mejorSeg && mejorSeg.matriculados) add('neu', 60, `⚖️ En orgánico, <b>${mejorSeg.nombre}</b> es el segmento que mejor convierte (${pct(mejorSeg.convPct, 1)}).`)
 
-  if (base.leadShare >= 40) add('neu', 55, `🧹 <b>${pct(base.leadShare, 0)} de los leads</b> son bases cargadas (no orgánico). Buena señal: hay margen para crecer el alcance ganado y bajar el costo de adquisición.`)
+  if (pauta.leadShare >= 60) add('neu', 55, `🧹 <b>${pct(pauta.leadShare, 0)} de los leads</b> vienen de pauta (incluidos los formularios nativos). El orgánico es margen para bajar el costo de adquisición.`)
 
   return C.sort((a, b) => b.score - a.score).slice(0, 7).map(({ tipo, texto }) => ({ tipo, texto }))
 }
