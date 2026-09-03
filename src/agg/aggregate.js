@@ -285,11 +285,17 @@ function nucleo(leads, mats, cfg) {
   const esNoUtil = esNoUtilSub
   const esPotencial = (sub) => POTENCIAL.has(sub)
 
+  // "Reciente" = ingresó hace ≤ 10 días (potenciales frescos/accionables).
+  const ahora = Date.now()
+  const DIEZ_DIAS = 10 * 864e5
+  const esReciente = (f) => { if (!f) return false; const t = +new Date(f); return t >= ahora - DIEZ_DIAS && t <= ahora }
+
   const funnel = {
     leadsTotales: leads.length,
     noUtiles: leads.filter((l) => esNoUtil(l.sub)).length,
     enGestion: leads.filter((l) => l.gestionado).length,
     potenciales: leads.filter((l) => esPotencial(l.sub)).length,
+    potencialesRecientes: leads.filter((l) => esPotencial(l.sub) && esReciente(l.fecha)).length,
     matriculados: mats.length,
     notas: [],
   }

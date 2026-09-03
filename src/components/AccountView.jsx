@@ -139,7 +139,7 @@ export default function AccountView({ cuenta }) {
           <div className="grid cols-4">
             <Kpi lbl="Leads totales" val={n0(dataVista.funnel.leadsTotales)} />
             <Kpi lbl="En gestión" val={n0(dataVista.funnel.enGestion)} />
-            <Kpi lbl="Potenciales" val={n0(dataVista.funnel.potenciales)} />
+            <Kpi lbl="Potenciales" val={n0(dataVista.funnel.potenciales)} sub={dataVista.funnel.potencialesRecientes != null ? <>‹10 días: <b>{n0(dataVista.funnel.potencialesRecientes)}</b></> : null} />
             <Kpi lbl="Matriculados" val={n0(dataVista.funnel.matriculados)} />
           </div>
 
@@ -205,11 +205,12 @@ export default function AccountView({ cuenta }) {
   )
 }
 
-function Kpi({ lbl, val }) {
+function Kpi({ lbl, val, sub }) {
   return (
     <div className="card kpi">
       <div className="lbl">{lbl}</div>
       <div className="val">{val}</div>
+      {sub && <div className="delta faint">{sub}</div>}
     </div>
   )
 }
