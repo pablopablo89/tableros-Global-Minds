@@ -71,6 +71,15 @@ export default function AccountView({ cuenta }) {
     return semanasEntre(inicio, hoy).reverse()
   }, [])
 
+  // Período para el reporte: null = ciclo completo; si no, { label, slug } del mes/semana.
+  const reportPeriodo = useMemo(() => {
+    if (semanaSel === 'todas') return null
+    if (semanaSel.startsWith('M:')) { const m = semanaSel.slice(2); return { label: mesLabel(m), slug: m, tipo: 'mes' } }
+    const wk = semanaSel.replace(/^S:/, '')
+    const w = (data?.semanal || []).find((x) => x.semana === wk)
+    return { label: `${fechaCorta(wk)} – ${fechaCorta(w?.fin || wk)}`, slug: `sem_${wk}`, tipo: 'semana' }
+  }, [semanaSel, data])
+
   const elegirSemana = (val) => {
     if (!val) { setFiltros((f) => ({ ...f, fechaInicio: undefined, fechaFin: undefined })); return }
     const s = semanas[Number(val)]
@@ -200,7 +209,7 @@ export default function AccountView({ cuenta }) {
         </>
       )}
 
-      {showReport && <ReportModal data={data} cfg={cuenta} onClose={() => setShowReport(false)} />}
+      {showReport && <ReportModal data={dataVista} periodo={reportPeriodo} cfg={cuenta} onClose={() => setShowReport(false)} />}
     </div>
   )
 }

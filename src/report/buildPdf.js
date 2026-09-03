@@ -19,10 +19,10 @@ const hx = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), par
 
 const W = 297, H = 210, M = 14 // A4 landscape (mm)
 
-export async function generarPdf(data, cfg, seleccion) {
+export async function generarPdf(data, cfg, seleccion, periodo = null) {
   const acc = hx(cfg.acento)
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  const ctx = { doc, acc, cfg, data, primeraLamina: true }
+  const ctx = { doc, acc, cfg, data, periodo, primeraLamina: true }
   HEADER = await imgDataUrl('header.png')
 
   const inc = (id) => seleccion.includes(id)
@@ -34,7 +34,8 @@ export async function generarPdf(data, cfg, seleccion) {
   if (inc('motivos')) slideMotivos(ctx)
   if (inc('objetivos')) slideObjetivos(ctx)
 
-  const nombre = `${cfg.nombre.replace(/\s+/g, '_')}_${data.fechaCorte}.pdf`
+  const suf = periodo ? periodo.slug : data.fechaCorte
+  const nombre = `${cfg.nombre.replace(/\s+/g, '_')}_${suf}.pdf`
   if (typeof document !== 'undefined') { doc.save(nombre); return nombre }
   return doc // entorno sin navegador (tests)
 }
@@ -65,7 +66,7 @@ function titulo(ctx, t) {
 }
 
 async function portada(ctx) {
-  const { doc, cfg, data } = ctx
+  const { doc, cfg, data, acc, periodo } = ctx
   nuevaLamina(ctx)
   doc.setFillColor(...INK); doc.rect(0, 0, W, H, 'F')
   const cover = await coverDataUrl(cfg)
@@ -76,6 +77,7 @@ async function portada(ctx) {
     if (W / H > imgRatio) { w = W; h = W / imgRatio; x = 0; y = (H - h) / 2 }
     else { h = H; w = H * imgRatio; y = 0; x = (W - w) / 2 }
     doc.addImage(cover, 'PNG', x, y, w, h)
+    pillPeriodo(doc, acc, periodo)
     return
   }
   doc.setFillColor(25, 70, 227); doc.rect(0, H / 2 - 2, W / 3, 3, 'F')
@@ -89,6 +91,18 @@ async function portada(ctx) {
   doc.text(cfg.subtitulo, W / 2, H / 2 + 18, { align: 'center' })
   doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.setTextColor(201, 206, 216)
   doc.text(`Reporte al ${fecha(data.fechaCorte)}`, W / 2, H / 2 + 28, { align: 'center' })
+  pillPeriodo(doc, acc, periodo)
+}
+
+// Etiqueta de período (pill) centrada en la parte baja de la portada.
+function pillPeriodo(doc, acc, periodo) {
+  if (!periodo) return
+  const txt = `PERÍODO · ${String(periodo.label).toUpperCase()}`
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11)
+  const tw = doc.getTextWidth(txt)
+  const pad = 6, h = 9, w = tw + pad * 2, x = (W - w) / 2, y = H - 20
+  doc.setFillColor(...acc); doc.roundedRect(x, y, w, h, 2, 2, 'F')
+  doc.setTextColor(255, 255, 255); doc.text(txt, W / 2, y + h / 2 + 1.2, { align: 'center' })
 }
 
 function slideFunnel(ctx) {

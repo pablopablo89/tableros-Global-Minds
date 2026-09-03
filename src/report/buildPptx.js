@@ -25,7 +25,7 @@ export const SECCIONES = [
   { id: 'objetivos', label: 'Inversión y matrículas vs objetivo', sub: 'Con acumulado', base: false },
 ]
 
-export async function generarPptx(data, cfg, seleccion) {
+export async function generarPptx(data, cfg, seleccion, periodo = null) {
   const acc = cfg.acento.replace('#', '')
   const pptx = new PptxGenJS()
   pptx.defineLayout({ name: 'W', width: 13.333, height: 7.5 })
@@ -36,7 +36,7 @@ export async function generarPptx(data, cfg, seleccion) {
   ACC = acc
   const inc = (id) => seleccion.includes(id)
 
-  if (inc('portada')) await portada(pptx, cfg, data)
+  if (inc('portada')) await portada(pptx, cfg, data, periodo)
   if (inc('funnel')) slideFunnel(pptx, cfg, data, acc)
   // Programas CONSOLIDADOS (una fila por programa, sumando todas las cohortes/bases).
   if (inc('prog_principal')) slidePrograma(pptx, `Detalle por programa — ${segPrincipal(cfg).nombre}`, consolidarProgramas(programasDe(data, segPrincipal(cfg).id)), acc)
@@ -45,7 +45,8 @@ export async function generarPptx(data, cfg, seleccion) {
   if (inc('motivos')) slideMotivos(pptx, cfg, data, acc)
   if (inc('objetivos')) slideObjetivos(pptx, cfg, data, acc)
 
-  const nombre = `${cfg.nombre.replace(/\s+/g, '_')}_${data.fechaCorte}.pptx`
+  const suf = periodo ? periodo.slug : data.fechaCorte
+  const nombre = `${cfg.nombre.replace(/\s+/g, '_')}_${suf}.pptx`
   await pptx.writeFile({ fileName: nombre })
   return nombre
 }
@@ -66,7 +67,7 @@ function tituloSlide(slide, titulo) {
   slide.addShape('rect', { x: 0.52, y: 1.52, w: 0.85, h: 0.055, fill: { color: ACC } })
 }
 
-async function portada(pptx, cfg, data) {
+async function portada(pptx, cfg, data, periodo = null) {
   const s = pptx.addSlide()
   s.background = { color: INK }
   const cover = await coverDataUrl(cfg)
@@ -81,6 +82,13 @@ async function portada(pptx, cfg, data) {
       { x: 0.5, y: 2.2, w: 12.3, h: 0.9, align: 'center', color: WHITE })
     s.addText(cfg.subtitulo, { x: 0.5, y: 3.5, w: 12.3, h: 0.7, align: 'center', fontSize: 26, color: WHITE, bold: true })
     s.addText(`Reporte al ${fecha(data.fechaCorte)}`, { x: 0.5, y: 4.2, w: 12.3, h: 0.5, align: 'center', fontSize: 14, color: 'C9CED8' })
+  }
+  // Etiqueta de período (pill) sobre la portada.
+  if (periodo) {
+    s.addText(`PERÍODO · ${String(periodo.label).toUpperCase()}`, {
+      x: 3.67, y: 6.62, w: 6, h: 0.5, align: 'center', valign: 'middle',
+      fontSize: 13, bold: true, color: WHITE, fill: { color: ACC }, rectRadius: 0.12, line: { color: ACC },
+    })
   }
 }
 
