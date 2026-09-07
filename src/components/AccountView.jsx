@@ -12,6 +12,7 @@ import ProgramTable from './ProgramTable.jsx'
 import CityChart from './CityChart.jsx'
 import Tipificaciones from './Tipificaciones.jsx'
 import Ticket from './Ticket.jsx'
+import Descuento from './Descuento.jsx'
 import DailyChart from './DailyChart.jsx'
 import ReportModal from '../report/ReportModal.jsx'
 import OrganicView from './OrganicView.jsx'
@@ -201,10 +202,13 @@ export default function AccountView({ cuenta }) {
           <div className="section-title">Geografía</div>
           <CityChart data={dataVista} />
 
-          <div className="section-title">Motivos de no compra y ticket</div>
+          <div className="section-title">Motivos de no compra · ticket · descuento</div>
           <div className="grid" style={{ gridTemplateColumns: '1fr' }}>
             <Tipificaciones data={dataVista} cfg={cuenta} />
-            <Ticket data={dataVista} cfg={cuenta} />
+            <div className="grid cols-2">
+              <Ticket data={dataVista} cfg={cuenta} />
+              <Descuento data={dataVista} cfg={cuenta} />
+            </div>
           </div>
         </>
       )}

@@ -40,6 +40,21 @@ const POTENCIAL = new Set(['En proceso de pago', 'En proceso de pago - No contes
 const norm = (s) => (s == null ? '' : String(s).trim())
 const money = (v) => (v == null || v === '' ? 0 : Number(v) || 0)
 
+// El campo descuento_aplicado viene MUY sucio y mezclado entre cuentas:
+//   UEES: fracciones ("0.4") y enteros ("40") = ambos 40%; typos ("3O%").
+//   Anáhuac: con signo ("25%","30%","90%","100%").
+// Normaliza todo a porcentaje 0–100 (null si no se puede interpretar).
+function parseDescuento(raw) {
+  if (raw == null) return null
+  let s = String(raw).trim().toLowerCase().replace(/o/g, '0').replace(',', '.').replace(/[^0-9.]/g, '')
+  if (s === '' || s === '.') return null
+  let v = Number(s)
+  if (isNaN(v) || v < 0) return null
+  if (v > 0 && v <= 1) v = v * 100 // fracción → porcentaje
+  if (v > 100) v = 100
+  return v
+}
+
 // Clave normalizada para fusionar el MISMO programa escrito distinto en
 // consulta_base vs matriculas (acentos, mayúsculas, espacios dobles).
 const STOP = new Set(['y', 'e', 'o', 'u', 'de', 'del', 'la', 'el', 'los', 'las', 'en', 'con', 'para', 'por', 'a', 'al', 'un', 'una', 'the'])
@@ -117,13 +132,14 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
       ciudad: norm(m.ciudad),
       fechaPago: m.fecha_de_pago,
       precio: money(m.precio_con_descuento) || money(m.precio_full),
+      descuento: parseDescuento(m.descuento_aplicado),
       macro: ch.macro, canal: ch.canal, fuente: fuenteLabel(src, med),
       srcRaw: norm(src), medRaw: norm(med),
     }
   })
 
   // ---------- Núcleo (funnel/segmentos/programas/ciudades/tipificaciones/ticket/ingresos) ----------
-  const { funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos } = nucleo(leads, mats, cfg)
+  const { funnel, segmentos, programas, ciudades, tipificaciones, ticket, descuento, ingresos } = nucleo(leads, mats, cfg)
 
   // ---------- Metas / inversión (objetivos + meta) ----------
   const metas = construirMetas(objetivos, meta, mats, leads, cfg)
@@ -151,7 +167,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
     fechaCorte: new Date().toISOString().slice(0, 10),
     cuenta: cfg.id,
     moneda: cfg.moneda,
-    funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, metas, leadsSemana, daily, cohortes, semanal, mensual, ventasMes, organico,
+    funnel, segmentos, programas, ciudades, tipificaciones, ticket, descuento, ingresos, metas, leadsSemana, daily, cohortes, semanal, mensual, ventasMes, organico,
     cobertura: { leads: leads.length, matriculas: mats.length },
   }
 }
@@ -350,10 +366,11 @@ function nucleo(leads, mats, cfg) {
   }
 
   const ticket = ticketPromedio(mats, cfg)
+  const descuento = descuentoPromedio(mats, cfg)
   const ingresos = { total: mats.reduce((a, m) => a + m.precio, 0), porSegmento: {} }
   for (const s of cfg.segmentos) ingresos.porSegmento[s.id] = mats.filter((m) => m.seg === s.id).reduce((a, m) => a + m.precio, 0)
 
-  return { funnel, segmentos, programas, ciudades, tipificaciones, ticket, ingresos, cobertura: { leads: leads.length, matriculas: mats.length } }
+  return { funnel, segmentos, programas, ciudades, tipificaciones, ticket, descuento, ingresos, cobertura: { leads: leads.length, matriculas: mats.length } }
 }
 
 // Un slice de `nucleo` por cada semana (lun-dom) del ciclo, para el filtro semanal.
@@ -385,6 +402,21 @@ function ticketPromedio(mats, cfg) {
   const todos = mats.filter((m) => m.precio > 0)
   if (todos.length) out.push({ tipo: 'Total', valor: todos.reduce((a, m) => a + m.precio, 0) / todos.length })
   return out
+}
+
+// Descuento promedio aplicado (%) sobre las matrículas con valor válido, por segmento y total.
+// Incluye "conPct" = qué porción de las matrículas tuvo algún descuento (>0).
+function descuentoPromedio(mats, cfg) {
+  const prom = (arr) => (arr.length ? arr.reduce((a, m) => a + m.descuento, 0) / arr.length : null)
+  const porSegmento = {}
+  for (const s of cfg.segmentos) porSegmento[s.id] = prom(mats.filter((m) => m.seg === s.id && m.descuento != null))
+  const con = mats.filter((m) => m.descuento != null)
+  return {
+    promedio: prom(con),
+    porSegmento,
+    muestra: con.length,
+    conDescuentoPct: con.length ? (con.filter((m) => m.descuento > 0).length / con.length) * 100 : null,
+  }
 }
 
 // Mapea el formato_programa de objetivos ("Masters"/"Diplomados"/"GMP") a segmento.
