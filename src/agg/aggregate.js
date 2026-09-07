@@ -411,11 +411,18 @@ function descuentoPromedio(mats, cfg) {
   const porSegmento = {}
   for (const s of cfg.segmentos) porSegmento[s.id] = prom(mats.filter((m) => m.seg === s.id && m.descuento != null))
   const con = mats.filter((m) => m.descuento != null)
+  // Distribución: cuántas matrículas usaron cada nivel de descuento (redondeado a %).
+  const distMap = new Map()
+  for (const m of con) { const k = Math.round(m.descuento); distMap.set(k, (distMap.get(k) || 0) + 1) }
+  const distribucion = [...distMap.entries()]
+    .map(([descuento, matriculas]) => ({ descuento, matriculas, uso: con.length ? (matriculas / con.length) * 100 : 0 }))
+    .sort((a, b) => b.matriculas - a.matriculas || b.descuento - a.descuento)
   return {
     promedio: prom(con),
     porSegmento,
     muestra: con.length,
     conDescuentoPct: con.length ? (con.filter((m) => m.descuento > 0).length / con.length) * 100 : null,
+    distribucion,
   }
 }
 

@@ -1,10 +1,11 @@
-import { pct } from '../lib/format.js'
+import { n0, pct } from '../lib/format.js'
 
-// Descuento promedio aplicado (%) sobre las matrículas, por segmento y total.
-// Responde al filtro de período (usa data.descuento del corte). Sólo tablero.
+// Distribución de descuentos: por cada nivel de descuento, cuántas matrículas lo
+// usaron y qué % del total representa. Responde al filtro de período. Sólo tablero.
 export default function Descuento({ data, cfg }) {
   const d = data.descuento
-  if (!d || d.promedio == null) {
+  const dist = d?.distribucion || []
+  if (!dist.length) {
     return (
       <div className="card">
         <div className="card-h"><h2>Descuento aplicado</h2></div>
@@ -16,19 +17,21 @@ export default function Descuento({ data, cfg }) {
     <div className="card">
       <div className="card-h">
         <h2>Descuento aplicado</h2>
-        <span className="hint">promedio sobre matrículas{d.conDescuentoPct != null ? ` · ${pct(d.conDescuentoPct, 0)} con descuento` : ''}</span>
+        <span className="hint">promedio {pct(d.promedio, 1)} · {n0(d.muestra)} matrículas</span>
       </div>
       <div className="card-b">
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>Tipo</th><th>Descuento promedio</th></tr></thead>
+            <thead><tr><th>Descuento</th><th>Matrículas</th><th>% de uso</th></tr></thead>
             <tbody>
-              {cfg.segmentos.map((s) => (
-                d.porSegmento?.[s.id] != null && (
-                  <tr key={s.id}><td>{s.nombre}</td><td>{pct(d.porSegmento[s.id], 1)}</td></tr>
-                )
+              {dist.map((r) => (
+                <tr key={r.descuento}>
+                  <td>{pct(r.descuento, 0)}</td>
+                  <td>{n0(r.matriculas)}</td>
+                  <td>{pct(r.uso, 1)}</td>
+                </tr>
               ))}
-              <tr className="total"><td>Total</td><td>{pct(d.promedio, 1)}</td></tr>
+              <tr className="total"><td>Total</td><td>{n0(d.muestra)}</td><td>100%</td></tr>
             </tbody>
           </table>
         </div>
