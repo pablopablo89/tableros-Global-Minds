@@ -416,7 +416,7 @@ function descuentoPromedio(mats, cfg) {
   for (const m of con) { const k = Math.round(m.descuento); distMap.set(k, (distMap.get(k) || 0) + 1) }
   const distribucion = [...distMap.entries()]
     .map(([descuento, matriculas]) => ({ descuento, matriculas, uso: con.length ? (matriculas / con.length) * 100 : 0 }))
-    .sort((a, b) => b.matriculas - a.matriculas || b.descuento - a.descuento)
+    .sort((a, b) => b.descuento - a.descuento)
   return {
     promedio: prom(con),
     porSegmento,
