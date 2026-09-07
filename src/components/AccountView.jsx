@@ -16,6 +16,7 @@ import Descuento from './Descuento.jsx'
 import DailyChart from './DailyChart.jsx'
 import ReportModal from '../report/ReportModal.jsx'
 import OrganicView from './OrganicView.jsx'
+import PerformanceView from './PerformanceView.jsx'
 
 export default function AccountView({ cuenta }) {
   const [filtros, setFiltros] = useState({})
@@ -88,6 +89,7 @@ export default function AccountView({ cuenta }) {
   }
 
   if (vista === 'organico') return <OrganicView cuenta={cuenta} data={data} onBack={() => setVista('tablero')} />
+  if (vista === 'performance') return <PerformanceView cuenta={cuenta} data={data} onBack={() => setVista('tablero')} />
 
   return (
     <div>
@@ -121,6 +123,7 @@ export default function AccountView({ cuenta }) {
         </div>
         <div className="spacer" />
         <button className="btn" onClick={() => setVista('organico')} disabled={!data} title="Alcance orgánico: adquisición sin pauta" style={{ borderColor: '#2E9E6B', color: '#227A52' }}>🌱 Alcance orgánico</button>
+        <button className="btn" onClick={() => setVista('performance')} disabled={!data} title="Performance por programa, objetivos y pauta" style={{ borderColor: cuenta.acento, color: cuenta.acento }}>📊 Performance</button>
         <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)">{refrescando ? '⏳ Actualizando…' : '⟳ Actualizar datos'}</button>
         <button className="btn primary" onClick={() => setShowReport(true)} disabled={!data}>Generar reporte</button>
       </div>

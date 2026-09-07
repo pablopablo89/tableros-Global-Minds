@@ -139,7 +139,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   })
 
   // ---------- Núcleo (funnel/segmentos/programas/ciudades/tipificaciones/ticket/ingresos) ----------
-  const { funnel, segmentos, programas, ciudades, tipificaciones, ticket, descuento, ingresos } = nucleo(leads, mats, cfg)
+  const { funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos } = nucleo(leads, mats, cfg)
 
   // ---------- Metas / inversión (objetivos + meta) ----------
   const metas = construirMetas(objetivos, meta, mats, leads, cfg)
@@ -163,11 +163,14 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   // ---------- Alcance orgánico (canal de adquisición) ----------
   const organico = construirOrganico(leads, mats, cfg)
 
+  // ---------- Performance (ads: inversión/alcance/CPL + cumplimiento de objetivos) ----------
+  const performance = construirPerformance(meta, metas)
+
   return {
     fechaCorte: new Date().toISOString().slice(0, 10),
     cuenta: cfg.id,
     moneda: cfg.moneda,
-    funnel, segmentos, programas, ciudades, tipificaciones, ticket, descuento, ingresos, metas, leadsSemana, daily, cohortes, semanal, mensual, ventasMes, organico,
+    funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos, metas, leadsSemana, daily, cohortes, semanal, mensual, ventasMes, organico, performance,
     cobertura: { leads: leads.length, matriculas: mats.length },
   }
 }
@@ -354,6 +357,39 @@ function nucleo(leads, mats, cfg) {
   }
   const programas = [...progMap.values()]
 
+  // Detalle por programa (consolidado por nombre, sin cohorte) para la vista Performance:
+  // contactabilidad, conversiones, descuento promedio y motivos de cierre.
+  const detMap = new Map()
+  const det = (seg, nombre) => {
+    const k = `${seg}||${normKey(nombre)}`
+    if (!detMap.has(k)) detMap.set(k, { segmento: seg, nombre, total: 0, gestionados: 0, contacto: 0, potenciales: 0, noUtil: 0, matriculados: 0, descSum: 0, descN: 0, _mot: new Map() })
+    return detMap.get(k)
+  }
+  for (const l of leads) {
+    if (!l.seg) continue
+    const p = det(l.seg, l.programa)
+    p.total++
+    if (l.gestionado) p.gestionados++
+    if (esContactado(l.sub)) p.contacto++
+    if (esPotencial(l.sub)) p.potenciales++
+    if (esNoUtil(l.sub)) { p.noUtil++; p._mot.set(l.sub, (p._mot.get(l.sub) || 0) + 1) }
+  }
+  for (const m of mats) {
+    if (!m.seg) continue
+    const p = det(m.seg, m.programa)
+    p.matriculados++
+    if (m.descuento != null) { p.descSum += m.descuento; p.descN++ }
+  }
+  const programasDetalle = fusionarDetalle([...detMap.values()]).map((p) => ({
+    segmento: p.segmento, nombre: p.nombre, key: normKey(p.nombre), total: p.total, gestionados: p.gestionados,
+    contacto: p.contacto, potenciales: p.potenciales, noUtil: p.noUtil, matriculados: p.matriculados,
+    contactoPct: p.total ? (p.contacto / p.total) * 100 : 0,
+    convLead: p.total ? (p.matriculados / p.total) * 100 : 0,
+    convContacto: p.contacto ? (p.matriculados / p.contacto) * 100 : 0,
+    descuento: p.descN ? p.descSum / p.descN : null,
+    motivos: [...p._mot.entries()].map(([motivo, leads]) => ({ motivo, leads })).sort((a, b) => b.leads - a.leads).slice(0, 6),
+  })).sort((a, b) => b.matriculados - a.matriculados || b.total - a.total)
+
   const ciuMap = new Map()
   for (const m of mats) { const c = m.ciudad || 'Sin especificar'; ciuMap.set(c, (ciuMap.get(c) || 0) + 1) }
   const ciudades = [...ciuMap.entries()].map(([ciudad, matriculados]) => ({ ciudad, matriculados })).sort((a, b) => b.matriculados - a.matriculados)
@@ -370,7 +406,7 @@ function nucleo(leads, mats, cfg) {
   const ingresos = { total: mats.reduce((a, m) => a + m.precio, 0), porSegmento: {} }
   for (const s of cfg.segmentos) ingresos.porSegmento[s.id] = mats.filter((m) => m.seg === s.id).reduce((a, m) => a + m.precio, 0)
 
-  return { funnel, segmentos, programas, ciudades, tipificaciones, ticket, descuento, ingresos, cobertura: { leads: leads.length, matriculas: mats.length } }
+  return { funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos, cobertura: { leads: leads.length, matriculas: mats.length } }
 }
 
 // Un slice de `nucleo` por cada semana (lun-dom) del ciclo, para el filtro semanal.
@@ -490,6 +526,81 @@ function construirMetas(objetivos, meta, mats, leads, cfg) {
 function rangoFechas(fechas) {
   const f = fechas.filter(Boolean).sort()
   return f.length ? { desde: f[0], hasta: f[f.length - 1] } : null
+}
+
+// Distancia de edición (Levenshtein) y similitud de nombres, igual criterio que el
+// tablero: fusiona programas que difieren por pocas letras (ej. "RRHH" vs "RR HH").
+function editDist(a, b) {
+  const m = a.length, n = b.length
+  if (!m) return n; if (!n) return m
+  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)])
+  for (let j = 0; j <= n; j++) d[0][j] = j
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+    const c = a[i - 1] === b[j - 1] ? 0 : 1
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c)
+  }
+  return d[m][n]
+}
+function nombresSimilares(a, b) {
+  if (a === b) return true
+  const maxLen = Math.max(a.length, b.length)
+  if (maxLen < 12) return false
+  return editDist(a, b) <= Math.max(2, Math.round(maxLen * 0.06))
+}
+
+// Fusión difusa de las entradas de detalle por programa (mismo segmento, nombre casi
+// igual). Suma contadores y combina el mapa de motivos; el de mayor volumen conserva el nombre.
+function fusionarDetalle(entries) {
+  const items = [...entries].sort((a, b) => (b.total + b.matriculados) - (a.total + a.matriculados))
+  const out = []
+  for (const e of items) {
+    const dst = out.find((o) => o.segmento === e.segmento && nombresSimilares(normKey(o.nombre), normKey(e.nombre)))
+    if (dst) {
+      dst.total += e.total; dst.gestionados += e.gestionados; dst.contacto += e.contacto
+      dst.potenciales += e.potenciales; dst.noUtil += e.noUtil; dst.matriculados += e.matriculados
+      dst.descSum += e.descSum; dst.descN += e.descN
+      for (const [k, v] of e._mot) dst._mot.set(k, (dst._mot.get(k) || 0) + v)
+    } else out.push(e)
+  }
+  return out
+}
+
+// Performance de pauta desde `meta` (Meta Ads, granular): agrega inversión, alcance
+// (reach), impresiones, clics y leads de ads (global y por programa), y el cumplimiento
+// de objetivos de matrículas. La inversión cubre la ventana descargada (mes en curso).
+function construirPerformance(meta, metas) {
+  const num = (v) => Number(v) || 0
+  const ads = { inversion: 0, impresiones: 0, alcance: 0, clics: 0, leadsAds: 0 }
+  const pmap = new Map()
+  for (const r of meta) {
+    ads.inversion += num(r.amount_spent)
+    ads.impresiones += num(r.impresions)
+    ads.alcance += num(r.reach)
+    ads.clics += num(r.outbound_clics)
+    ads.leadsAds += num(r.registration_completed)
+    const nombre = norm(r.programa)
+    if (!nombre) continue
+    const k = normKey(nombre)
+    if (!pmap.has(k)) pmap.set(k, { nombre, inversion: 0, impresiones: 0, alcance: 0, clics: 0, leadsAds: 0 })
+    const p = pmap.get(k)
+    p.inversion += num(r.amount_spent); p.impresiones += num(r.impresions)
+    p.alcance += num(r.reach); p.clics += num(r.outbound_clics); p.leadsAds += num(r.registration_completed)
+  }
+  const adsPorPrograma = [...pmap.values()]
+    .map((p) => ({ ...p, key: normKey(p.nombre), cpl: p.leadsAds ? p.inversion / p.leadsAds : null }))
+    .sort((a, b) => b.inversion - a.inversion)
+  const v = metas.inversionVentana
+  return {
+    ads: {
+      ...ads,
+      cpl: ads.leadsAds ? ads.inversion / ads.leadsAds : null,      // CPL sobre leads reportados por Meta
+      cplReal: v && v.leads ? ads.inversion / v.leads : null,        // CPL sobre leads reales de la ventana
+      ctr: ads.impresiones ? (ads.clics / ads.impresiones) * 100 : null,
+      ventana: metas.coberturaInversion,
+    },
+    adsPorPrograma,
+    objetivos: { matriculas: metas.matriculas, leads: metas.leads, porSegmento: metas.porSegmento },
+  }
 }
 
 function lunes(d) { const x = new Date(d); x.setHours(0,0,0,0); const dow=(x.getDay()+6)%7; x.setDate(x.getDate()-dow); return x }

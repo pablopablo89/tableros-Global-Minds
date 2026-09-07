@@ -245,6 +245,10 @@ export default function OrganicView({ cuenta, data, onBack }) {
         </div>
       </div>
 
+      {/* Volumen de leads por mes (orgánico) — tendencia del ciclo completo */}
+      <div className="section-title">Volumen de leads orgánicos por mes</div>
+      <LeadsPorMes serie={data.organico?.mensual || []} />
+
       {/* Geografía + Evolución */}
       <div className="grid" style={{ marginTop: 18, gridTemplateColumns: periodView ? '1fr' : '1fr 1fr' }}>
         <div className="card">
@@ -283,6 +287,26 @@ export default function OrganicView({ cuenta, data, onBack }) {
             </div>
           </div>
         </div>}
+      </div>
+    </div>
+  )
+}
+
+function LeadsPorMes({ serie }) {
+  if (!serie.length) return <div className="card"><div className="card-b small faint">Sin datos mensuales.</div></div>
+  const max = Math.max(...serie.map((m) => m.leads), 1)
+  return (
+    <div className="card">
+      <div className="card-b">
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${serie.length}, 1fr)`, gap: 8, alignItems: 'end', height: 180 }}>
+          {serie.map((m) => (
+            <div key={m.mes} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, height: '100%', justifyContent: 'flex-end' }}>
+              <div className="small" style={{ fontWeight: 700, color: 'var(--acc)' }}>{n0(m.leads)}</div>
+              <div title={`${m.leads} leads`} style={{ width: '70%', maxWidth: 42, height: `${Math.max((m.leads / max) * 100, 2)}%`, background: 'var(--acc)', borderRadius: '4px 4px 0 0', minHeight: 3 }} />
+              <div className="small faint">{mesCorto(m.mes)}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
