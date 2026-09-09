@@ -309,10 +309,13 @@ function nucleo(leads, mats, cfg) {
   const DIEZ_DIAS = 10 * 864e5
   const esReciente = (f) => { if (!f) return false; const t = +new Date(f); return t >= ahora - DIEZ_DIAS && t <= ahora }
 
+  const noUtiles = leads.filter((l) => esNoUtil(l.sub)).length
   const funnel = {
     leadsTotales: leads.length,
-    noUtiles: leads.filter((l) => esNoUtil(l.sub)).length,
-    enGestion: leads.filter((l) => l.gestionado).length,
+    noUtiles,
+    utiles: leads.length - noUtiles, // en gestión = total − no útiles (embudo que resta)
+    gestionadosFlag: leads.filter((l) => l.gestionado).length, // flag neotel (~99%), informativo
+    enGestion: leads.length - noUtiles, // "en gestión" del embudo = útiles
     potenciales: leads.filter((l) => esPotencial(l.sub)).length,
     potencialesRecientes: leads.filter((l) => esPotencial(l.sub) && esReciente(l.fecha)).length,
     matriculados: mats.length,

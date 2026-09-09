@@ -36,16 +36,16 @@ export function subtotalDe(filas) {
 }
 
 // Pasos del funnel con ancho relativo y conversión relativa a la base correcta.
-// No es un embudo estrictamente secuencial: "no útiles" y "en gestión" se miden
-// sobre el total; "potenciales" y "matriculados" sobre "en gestión" (como el PDF).
+// Embudo secuencial que RESTA: Leads totales → En gestión (útiles = total − no útiles)
+// → Matriculados. "No útiles" se muestra como deducción en el primer conector.
+// "Potenciales" (en proceso de pago) es un estado transitorio → va como anotación aparte.
 export function pasosFunnel(f) {
-  const g = f.enGestion || 1
   const t = f.leadsTotales || 1
+  const utiles = f.utiles != null ? f.utiles : (f.leadsTotales || 0) - (f.noUtiles || 0)
+  const g = utiles || 1
   const pasos = [
     { id: 'leadsTotales', label: 'Leads totales', val: f.leadsTotales, conv: null },
-    { id: 'noUtiles', label: 'No útiles', val: f.noUtiles, conv: pct(f.noUtiles, t), base: 'del total' },
-    { id: 'enGestion', label: 'En gestión', val: f.enGestion, conv: pct(f.enGestion, t), base: 'del total' },
-    { id: 'potenciales', label: 'Potenciales', val: f.potenciales, conv: pct(f.potenciales, g), base: 'de en gestión' },
+    { id: 'enGestion', label: 'En gestión', val: utiles, conv: pct(utiles, t), base: 'del total', deducVal: f.noUtiles, deducPct: pct(f.noUtiles, t) },
     { id: 'matriculados', label: 'Matriculados', val: f.matriculados, conv: pct(f.matriculados, g), base: 'de en gestión' },
   ]
   const max = Math.max(...pasos.map((p) => p.val), 1)

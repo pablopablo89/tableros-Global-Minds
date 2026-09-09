@@ -37,12 +37,18 @@ function FunnelSVG({ pasos, acc }) {
         const y1 = g.y + bandH, y2 = nx.y
         const pts = `${g.x},${y1} ${g.x + g.w},${y1} ${nx.x + nx.w},${y2} ${nx.x},${y2}`
         const p = pasos[i + 1]
+        const midY = (y1 + y2) / 2
         return (
           <g key={'c' + i}>
             <polygon points={pts} fill={acc} opacity="0.16" />
             {p.conv != null && (
-              <text x={cx} y={(y1 + y2) / 2 + 3.5} textAnchor="middle" fontSize="10.5" fill="var(--muted)">
+              <text x={cx} y={p.deducVal != null ? midY - 2 : midY + 3.5} textAnchor="middle" fontSize="10.5" fill="var(--muted)">
                 ↓ {pct(p.conv)} {p.base}
+              </text>
+            )}
+            {p.deducVal != null && (
+              <text x={cx} y={midY + 11} textAnchor="middle" fontSize="9.5" fill="var(--muted)" opacity="0.85">
+                − {n0(p.deducVal)} no útiles ({pct(p.deducPct, 0)})
               </text>
             )}
           </g>
@@ -77,6 +83,10 @@ export default function Funnel({ data, cfg }) {
         <div className="grid cols-2" style={{ alignItems: 'center' }}>
           <div>
             <FunnelSVG pasos={pasos} acc={cfg.acento} />
+            <div className="small faint" style={{ marginTop: 8, lineHeight: 1.5 }}>
+              <b>En gestión</b> = leads útiles (total − no útiles).{' '}
+              {data.funnel.potenciales != null && <>De ellos, <b>{n0(data.funnel.potenciales)}</b> son potenciales (en proceso de pago).</>}
+            </div>
             {data.funnel.notas?.map((nota, i) => (
               <div key={i} className="small faint" style={{ marginTop: 6 }}>{nota}</div>
             ))}
