@@ -25,30 +25,32 @@ export default function AccountView({ cuenta }) {
   const [vista, setVista] = useState('tablero')
   const [refrescando, setRefrescando] = useState(false)
   const [msgRefresco, setMsgRefresco] = useState('')
+  const [msgTipo, setMsgTipo] = useState('info') // info | ok | error
+  const aviso = (texto, tipo = 'info') => { setMsgRefresco(texto); setMsgTipo(tipo) }
 
   const actualizarDatos = async () => {
-    setRefrescando(true); setMsgRefresco('Iniciando actualización…')
+    setRefrescando(true); aviso('Iniciando actualización…', 'info')
     let key = ''
     try { key = sessionStorage.getItem('nods_app_key') || '' } catch {}
     const prev = data?.actualizado
     try {
       const r = await fetch('/api/refresh', { method: 'POST', headers: { 'x-app-key': key } })
-      if (!r.ok) { const j = await r.json().catch(() => ({})); setMsgRefresco('No se pudo iniciar: ' + (j.error || r.status)); setRefrescando(false); return }
-      setMsgRefresco('⏳ Trayendo datos nuevos de NODS… tarda ~2 minutos, dejá esta pestaña abierta.')
+      if (!r.ok) { const j = await r.json().catch(() => ({})); aviso('❌ No se pudo iniciar la actualización: ' + (j.error || r.status), 'error'); setRefrescando(false); return }
+      aviso('⏳ Trayendo datos nuevos de NODS… tarda ~2 minutos, dejá esta pestaña abierta.', 'info')
       const start = Date.now()
       const poll = async () => {
-        if (Date.now() - start > 300000) { setMsgRefresco('Está tardando más de lo normal. Probá recargar la página en unos minutos.'); setRefrescando(false); return }
+        if (Date.now() - start > 300000) { aviso(`❌ La actualización falló o no trajo datos nuevos. La fuente (NODS) puede estar caída. Los datos siguen siendo los del ${data?.actualizado ? new Date(data.actualizado).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' }) : 'último refresco'}.`, 'error'); setRefrescando(false); return }
         try {
           const s = await fetch(`/snapshots/${cuenta.id}.json?t=${Date.now()}`, { cache: 'no-store' })
           if (s.ok) {
             const j = await s.json()
-            if (j.actualizado && j.actualizado !== prev) { setMsgRefresco('✓ ¡Datos actualizados!'); setRefrescando(false); recargar(); return }
+            if (j.actualizado && j.actualizado !== prev) { aviso('✓ ¡Datos actualizados!', 'ok'); setRefrescando(false); recargar(); return }
           }
         } catch {}
         setTimeout(poll, 12000)
       }
       setTimeout(poll, 25000)
-    } catch (e) { setMsgRefresco('Error: ' + e); setRefrescando(false) }
+    } catch (e) { aviso('❌ Error al actualizar: ' + e, 'error'); setRefrescando(false) }
   }
   const { loading, error, data, actualizado, modo, recargar } = useAccountData(cuenta, filtros)
 
@@ -127,7 +129,26 @@ export default function AccountView({ cuenta }) {
         <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)">{refrescando ? '⏳ Actualizando…' : '⟳ Actualizar datos'}</button>
         <button className="btn primary" onClick={() => setShowReport(true)} disabled={!data}>Generar reporte</button>
       </div>
-      {msgRefresco && <div className="card" style={{ marginBottom: 16 }}><div className="card-b small">{msgRefresco}</div></div>}
+      {msgRefresco && (
+        <div className="card" style={{ marginBottom: 16, ...bannerStyle(msgTipo) }}>
+          <div className="card-b small" style={{ fontWeight: msgTipo === 'error' ? 600 : 400 }}>{msgRefresco}</div>
+        </div>
+      )}
+
+      {(() => {
+        const horas = data?.actualizado ? (Date.now() - new Date(data.actualizado).getTime()) / 36e5 : null
+        if (horas == null || horas <= 26 || refrescando || msgTipo === 'error') return null
+        const dias = Math.floor(horas / 24)
+        const hace = dias >= 1 ? `hace ${dias} día${dias > 1 ? 's' : ''}` : `hace ${Math.round(horas)} h`
+        return (
+          <div className="card" style={{ marginBottom: 16, ...bannerStyle('error') }}>
+            <div className="card-b small">
+              ⚠️ <b>Los datos no se actualizan desde el {new Date(data.actualizado).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}</b> ({hace}).
+              Puede haber un problema con la fuente (NODS). Probá <b>“⟳ Actualizar datos”</b>; si sigue igual, el refresco automático reintenta cada día y se recupera solo cuando NODS responda.
+            </div>
+          </div>
+        )
+      })()}
 
       {modo !== 'live' && (
         <p className="small faint" style={{ marginTop: -6, marginBottom: 16 }}>
@@ -230,6 +251,12 @@ function Kpi({ lbl, val, sub }) {
       {sub && <div className="delta faint">{sub}</div>}
     </div>
   )
+}
+
+function bannerStyle(tipo) {
+  if (tipo === 'error') return { borderColor: '#E4A6A0', background: '#FDECEA' }
+  if (tipo === 'ok') return { borderColor: '#9FD3BB', background: '#E7F4EE' }
+  return {}
 }
 
 function mesLabel(yyyymm) {
