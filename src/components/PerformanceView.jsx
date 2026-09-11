@@ -46,7 +46,9 @@ export default function PerformanceView({ cuenta, data, onBack }) {
   const premValorPct = equiv ? ((prem.matriculados || 0) * PESO_PREMIUM / equiv) * 100 : 0
 
   const detalleTodos = vista.programasDetalle || []
-  const opciones = [...(data.programasDetalle || [])].sort((a, b) => a.nombre.localeCompare(b.nombre))
+  const segOrden = Object.fromEntries(cuenta.segmentos.map((s, i) => [s.id, i]))
+  const tipoDe = (segId) => { const s = cuenta.segmentos.find((x) => x.id === segId); return s ? s.nombre.replace(/s$/, '') : '' }
+  const opciones = [...(data.programasDetalle || [])].sort((a, b) => (segOrden[a.segmento] - segOrden[b.segmento]) || a.nombre.localeCompare(b.nombre))
   const progSel = prog !== 'todos' ? detalleTodos.find((p) => p.key === prog) : null
 
   const selPeriodo = (
@@ -64,7 +66,7 @@ export default function PerformanceView({ cuenta, data, onBack }) {
       <label>Programa (detalle)</label>
       <select value={prog} onChange={(e) => setProg(e.target.value)}>
         <option value="todos">Todos los programas</option>
-        {opciones.map((p) => <option key={p.segmento + '|' + p.key} value={p.key}>{limpiar(p.nombre)}</option>)}
+        {opciones.map((p) => <option key={p.segmento + '|' + p.key} value={p.key}>{tipoDe(p.segmento)} · {limpiar(p.nombre)}</option>)}
       </select>
     </div>
   )
