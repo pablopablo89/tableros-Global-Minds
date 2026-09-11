@@ -1,6 +1,10 @@
 import { useMemo, useState } from 'react'
 import { n0, pct, money, fechaCorta } from '../lib/format.js'
 
+// Peso comercial de un Máster/GMP en "unidades equivalentes" de diplomado.
+const PESO_PREMIUM = 2.5
+const PESO_LABEL = String(PESO_PREMIUM).replace('.', ',')
+
 // Página "Performance": pensada para leerse como un reporte de agencia.
 //  · GMP/Másters y Diplomados SEPARADOS (1 Máster/GMP = 3 diplomados en valor).
 //  · Cruce CREATIVOS → VENTAS: qué formato y qué ángulo de anuncio vende (no sólo trae leads).
@@ -38,8 +42,8 @@ export default function PerformanceView({ cuenta, data, onBack }) {
   const segDip = cuenta.segmentos.find((s) => s.id === 'dip') || cuenta.segmentos[1]
   const segRow = (id) => (vista.segmentos || []).find((s) => s.id === id) || {}
   const prem = segRow(segPrem.id), dip = segRow(segDip.id)
-  const equiv = (prem.matriculados || 0) * 3 + (dip.matriculados || 0)
-  const premValorPct = equiv ? ((prem.matriculados || 0) * 3 / equiv) * 100 : 0
+  const equiv = (prem.matriculados || 0) * PESO_PREMIUM + (dip.matriculados || 0)
+  const premValorPct = equiv ? ((prem.matriculados || 0) * PESO_PREMIUM / equiv) * 100 : 0
 
   const detalleTodos = vista.programasDetalle || []
   const opciones = [...(data.programasDetalle || [])].sort((a, b) => a.nombre.localeCompare(b.nombre))
@@ -87,18 +91,18 @@ export default function PerformanceView({ cuenta, data, onBack }) {
 
       {/* ===== GMP/Másters vs Diplomados, separados ===== */}
       <div className="section-title">Por tipo de programa
-        <Info>Se muestran separados porque tienen valor y objetivos distintos: <b>1 {segPrem.nombre.replace(/s$/, '')} equivale a 3 diplomados</b>.<span className="src">Segmentación por el nombre del programa</span></Info>
+        <Info>Se muestran separados porque tienen valor y objetivos distintos: <b>1 {segPrem.nombre.replace(/s$/, '')} equivale a {PESO_LABEL} diplomados</b>.<span className="src">Segmentación por el nombre del programa</span></Info>
       </div>
 
       <div className="callout" style={{ marginBottom: 14 }}>
         <span className="ic">⚖️</span>
         <div>
-          <b>Valor equivalente:</b> {n0(equiv)} unidades <span className="faint">(1 {segPrem.nombre.replace(/s$/, '')} = 3 diplomados)</span> — {n0(prem.matriculados)} {segPrem.nombre} × 3 + {n0(dip.matriculados)} diplomados.
+          <b>Valor equivalente:</b> {n0(equiv)} unidades <span className="faint">(1 {segPrem.nombre.replace(/s$/, '')} = {PESO_LABEL} diplomados)</span> — {n0(prem.matriculados)} {segPrem.nombre} × {PESO_LABEL} + {n0(dip.matriculados)} diplomados.
           {' '}{segPrem.nombre} concentra <b>{pct(premValorPct, 0)}</b> del valor comercial del período.
         </div>
       </div>
 
-      <SegBlock seg={segPrem} row={prem} obj={obj.porSegmento?.[segPrem.id]} detalle={detalleTodos} acc={acc} cuenta={cuenta} icon="🎓" tag={`valor ×3`} periodView={periodView} />
+      <SegBlock seg={segPrem} row={prem} obj={obj.porSegmento?.[segPrem.id]} detalle={detalleTodos} acc={acc} cuenta={cuenta} icon="🎓" tag={`valor ×${PESO_LABEL}`} periodView={periodView} />
       <SegBlock seg={segDip} row={dip} obj={obj.porSegmento?.[segDip.id]} detalle={detalleTodos} acc={mezcla(acc)} cuenta={cuenta} icon="📗" tag={`valor ×1`} periodView={periodView} />
 
       {/* ===== Cumplimiento de objetivos ===== */}
