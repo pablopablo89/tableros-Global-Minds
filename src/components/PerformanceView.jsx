@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { n0, pct, money, fecha, fechaCorta } from '../lib/format.js'
+import { n0, pct, money, fechaCorta } from '../lib/format.js'
 
-// Página "Performance": desglose por programa (contactabilidad, conversiones, motivos
-// de cierre, descuento), cumplimiento de objetivos y datos de pauta (inversión, alcance,
-// CPL). Filtros por período (mes/semana) y por programa. Sólo tablero.
+// Página "Performance": pensada para leerse como un reporte de agencia.
+//  · GMP/Másters y Diplomados SEPARADOS (1 Máster/GMP = 3 diplomados en valor).
+//  · Cruce CREATIVOS → VENTAS: qué formato y qué ángulo de anuncio vende (no sólo trae leads).
+//  · Cada métrica lleva un "?" que explica qué es y de dónde sale.
 export default function PerformanceView({ cuenta, data, onBack }) {
   const [periodo, setPeriodo] = useState('todas')
   const [prog, setProg] = useState('todos')
@@ -18,6 +19,32 @@ export default function PerformanceView({ cuenta, data, onBack }) {
   }, [data, periodo])
   const periodView = periodo !== 'todas'
 
+  if (!data || !vista) {
+    return <div><BackBar cuenta={cuenta} onBack={onBack} /><div className="card"><div className="card-b">Este snapshot todavía no tiene datos de performance. Tocá “Actualizar datos” en el tablero.</div></div></div>
+  }
+
+  const acc = cuenta.acento
+  const perf = data.performance || {}
+  const ads = perf.ads || {}
+  const obj = perf.objetivos || {}
+  const invCrea = perf.inversionCreativos || {}
+  const crea = vista.creativos || { formatos: [], angulos: [], cobertura: {} }
+
+  const f = vista.funnel || {}
+  const convGlobal = f.leadsTotales ? (f.matriculados / f.leadsTotales) * 100 : 0
+
+  // Segmentos: premium (Másters/GMP = ×3) y diplomados (×1).
+  const segPrem = cuenta.segmentos[0]
+  const segDip = cuenta.segmentos.find((s) => s.id === 'dip') || cuenta.segmentos[1]
+  const segRow = (id) => (vista.segmentos || []).find((s) => s.id === id) || {}
+  const prem = segRow(segPrem.id), dip = segRow(segDip.id)
+  const equiv = (prem.matriculados || 0) * 3 + (dip.matriculados || 0)
+  const premValorPct = equiv ? ((prem.matriculados || 0) * 3 / equiv) * 100 : 0
+
+  const detalleTodos = vista.programasDetalle || []
+  const opciones = [...(data.programasDetalle || [])].sort((a, b) => a.nombre.localeCompare(b.nombre))
+  const progSel = prog !== 'todos' ? detalleTodos.find((p) => p.key === prog) : null
+
   const selPeriodo = (
     <div className="field">
       <label>Período</label>
@@ -28,24 +55,9 @@ export default function PerformanceView({ cuenta, data, onBack }) {
       </select>
     </div>
   )
-
-  if (!data || !vista) {
-    return <div><BackBar cuenta={cuenta} onBack={onBack} /><div className="card"><div className="card-b">Este snapshot todavía no tiene datos de performance. Tocá “Actualizar datos” en el tablero.</div></div></div>
-  }
-
-  const perf = data.performance || {}
-  const ads = perf.ads || {}
-  const obj = perf.objetivos || {}
-  const detalleTodos = vista.programasDetalle || []
-  const opciones = [...(data.programasDetalle || [])].sort((a, b) => a.nombre.localeCompare(b.nombre))
-  const progSel = prog !== 'todos' ? detalleTodos.find((p) => p.key === prog) : null
-  const filas = [...(prog !== 'todos' ? detalleTodos.filter((p) => p.key === prog) : detalleTodos)]
-    .sort((a, b) => b.matriculados - a.matriculados || b.total - a.total)
-  const adsSel = prog !== 'todos' ? (perf.adsPorPrograma || []).find((a) => a.key === prog) : null
-
   const selPrograma = (
     <div className="field" style={{ minWidth: 240 }}>
-      <label>Programa</label>
+      <label>Programa (detalle)</label>
       <select value={prog} onChange={(e) => setProg(e.target.value)}>
         <option value="todos">Todos los programas</option>
         {opciones.map((p) => <option key={p.segmento + '|' + p.key} value={p.key}>{limpiar(p.nombre)}</option>)}
@@ -53,53 +65,142 @@ export default function PerformanceView({ cuenta, data, onBack }) {
     </div>
   )
 
-  const mm = obj.matriculas || {}
-  const objPct = mm.meta ? (mm.real / mm.meta) * 100 : null
-
   return (
     <div>
       <BackBar cuenta={cuenta} onBack={onBack} />
-      <div className="toolbar">{selPeriodo}{selPrograma}<div className="spacer" /></div>
-
-      {/* Pauta / alcance / CPL (ventana con inversión) */}
-      <div className="section-title">Pauta · alcance · CPL {ads.ventana && <span className="faint" style={{ textTransform: 'none', fontWeight: 400 }}>· ventana {fechaCorta(ads.ventana.desde)}–{fechaCorta(ads.ventana.hasta)}</span>}</div>
-      {adsSel && (
-        <div className="card" style={{ marginBottom: 12, borderColor: cuenta.acento }}>
-          <div className="card-b small">📣 Pauta del programa <b>{limpiar(adsSel.nombre)}</b>: inversión <b>{money(adsSel.inversion, cuenta.moneda)}</b> · {n0(adsSel.leadsAds)} leads de ads · CPL <b>{adsSel.cpl != null ? money(adsSel.cpl, cuenta.moneda) : '—'}</b> · alcance {n0(adsSel.alcance)} · {n0(adsSel.impresiones)} impresiones.</div>
-        </div>
-      )}
-      <div className="grid cols-4">
-        <Kpi lbl="Inversión en ads" val={money(ads.inversion, cuenta.moneda)} />
-        <Kpi lbl="CPL global" val={ads.cplReal != null ? money(ads.cplReal, cuenta.moneda) : '—'} sub="inversión / leads reales" />
-        <Kpi lbl="Alcance (personas)" val={ads.alcance ? n0(ads.alcance) : '—'} sub={ads.impresiones ? `${n0(ads.impresiones)} impresiones` : null} />
-        <Kpi lbl="Clics salientes" val={ads.clics ? n0(ads.clics) : '—'} sub={ads.ctr != null ? `CTR ${pct(ads.ctr, 2)}` : null} />
+      <div className="toolbar">{selPeriodo}{selPrograma}<div className="spacer" />
+        <span className="small faint">{periodView ? 'Período seleccionado' : 'Ciclo completo'}</span>
       </div>
-      <p className="small faint" style={{ marginTop: 8 }}>La inversión y el alcance corresponden a la ventana descargada de Meta Ads (mes en curso); no cambian con el filtro de período.</p>
 
-      {/* Cumplimiento de objetivos en matrículas */}
-      <div className="section-title">Cumplimiento de objetivos · matrículas</div>
-      <div className="card">
-        <div className="card-b">
-          <Meter titulo="Total matrículas" real={mm.real} meta={mm.meta} pct={objPct} acc={cuenta.acento} />
-          <div className="grid cols-2" style={{ marginTop: 8 }}>
+      {/* ===== KPIs de cabecera ===== */}
+      <div className="grid cols-6">
+        <Kpi lbl="Leads" val={n0(f.leadsTotales)} info={<>Leads cargados en el CRM (consulta_base) dentro del período elegido.<span className="src">Fuente: NODS · consulta_base</span></>} />
+        <Kpi lbl="Matrículas" val={n0(f.matriculados)} info={<>Inscripciones pagadas en el período.<span className="src">Fuente: NODS · matriculas</span></>} />
+        <Kpi lbl="Conversión" val={pct(convGlobal, 2)} info={<>Matrículas ÷ leads del período. Cuántos de cada 100 leads terminan matriculados.<span className="src">Cálculo: matrículas / leads</span></>} />
+        <Kpi lbl="Inversión Meta" val={money(ads.inversion, cuenta.moneda)} info={<>Gasto en Meta Ads de la ventana descargada (<b>mes en curso</b>). No cambia con el filtro de período.<span className="src">Fuente: Meta Ads · amount_spent</span></>} />
+        <Kpi lbl="CPL global" val={ads.cplReal != null ? money(ads.cplReal, cuenta.moneda) : '—'} info={<>Costo por lead: inversión de la ventana ÷ leads reales de esa ventana.<span className="src">Cálculo: inversión / leads (ventana Meta)</span></>} />
+        <Kpi lbl="Alcance" val={ads.alcance ? n0(ads.alcance) : '—'} sub={ads.impresiones ? `${n0(ads.impresiones)} impresiones` : null} info={<>Personas únicas alcanzadas por la pauta en la ventana de Meta.<span className="src">Fuente: Meta Ads · reach</span></>} />
+      </div>
+      <p className="small faint" style={{ marginTop: 8 }}>
+        Inversión, CPL, alcance e impresiones vienen de Meta Ads y cubren {ads.ventana ? <>la ventana <b>{fechaCorta(ads.ventana.desde)}–{fechaCorta(ads.ventana.hasta)}</b> (mes en curso)</> : 'el mes en curso'}; no se mueven con el filtro de período. Leads, matrículas y conversión sí responden al período.
+      </p>
+
+      {/* ===== GMP/Másters vs Diplomados, separados ===== */}
+      <div className="section-title">Por tipo de programa
+        <Info>Se muestran separados porque tienen valor y objetivos distintos: <b>1 {segPrem.nombre.replace(/s$/, '')} equivale a 3 diplomados</b>.<span className="src">Segmentación por el nombre del programa</span></Info>
+      </div>
+
+      <div className="callout" style={{ marginBottom: 14 }}>
+        <span className="ic">⚖️</span>
+        <div>
+          <b>Valor equivalente:</b> {n0(equiv)} unidades <span className="faint">(1 {segPrem.nombre.replace(/s$/, '')} = 3 diplomados)</span> — {n0(prem.matriculados)} {segPrem.nombre} × 3 + {n0(dip.matriculados)} diplomados.
+          {' '}{segPrem.nombre} concentra <b>{pct(premValorPct, 0)}</b> del valor comercial del período.
+        </div>
+      </div>
+
+      <SegBlock seg={segPrem} row={prem} obj={obj.porSegmento?.[segPrem.id]} detalle={detalleTodos} acc={acc} cuenta={cuenta} icon="🎓" tag={`valor ×3`} periodView={periodView} />
+      <SegBlock seg={segDip} row={dip} obj={obj.porSegmento?.[segDip.id]} detalle={detalleTodos} acc={mezcla(acc)} cuenta={cuenta} icon="📗" tag={`valor ×1`} periodView={periodView} />
+
+      {/* ===== Cumplimiento de objetivos ===== */}
+      <div className="section-title">Cumplimiento de objetivos
+        <Info>Metas que NODS carga por semana y formato (Másters/GMP y Diplomados). Comparamos lo real acumulado del ciclo contra la meta total.<span className="src">Fuente: NODS · objetivos</span></Info>
+      </div>
+      <div className="grid cols-2">
+        <div className="card">
+          <div className="card-h"><h2>Matrículas vs meta</h2><span className="hint">ciclo completo</span></div>
+          <div className="card-b">
             {cuenta.segmentos.map((s) => {
               const ps = obj.porSegmento?.[s.id]
-              if (!ps) return null
-              const p = ps.matMeta ? (ps.matReal / ps.matMeta) * 100 : null
-              return <Meter key={s.id} titulo={s.nombre} real={ps.matReal} meta={ps.matMeta} pct={p} acc={cuenta.acento} />
+              const p = ps && ps.matMeta ? (ps.matReal / ps.matMeta) * 100 : null
+              return <Meter key={s.id} titulo={s.nombre} real={ps?.matReal} meta={ps?.matMeta} pct={p} acc={acc} />
             })}
           </div>
-          <p className="small faint" style={{ margin: '10px 0 0' }}>Objetivos del ciclo completo (NODS los carga por semana).</p>
+        </div>
+        <div className="card">
+          <div className="card-h"><h2>Leads vs meta</h2><span className="hint">ciclo completo</span></div>
+          <div className="card-b">
+            {cuenta.segmentos.map((s) => {
+              const ps = obj.porSegmento?.[s.id]
+              const p = ps && ps.leadsMeta ? (ps.leadsReal / ps.leadsMeta) * 100 : null
+              return <Meter key={s.id} titulo={s.nombre} real={ps?.leadsReal} meta={ps?.leadsMeta} pct={p} acc={acc} />
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Detalle por programa */}
-      <div className="section-title">Detalle por programa {periodView && <span className="faint" style={{ textTransform: 'none', fontWeight: 400 }}>· período seleccionado</span>}</div>
-      <div className="card">
+      {/* ===== CREATIVOS → VENTAS (el cruce) ===== */}
+      <CreativosBoard crea={crea} invCrea={invCrea} acc={acc} cuenta={cuenta} periodView={periodView} />
+
+      {/* ===== Detalle por programa (filtro) + drill ===== */}
+      <div className="section-title">Detalle por programa {progSel && <span className="faint" style={{ textTransform: 'none', fontWeight: 400 }}>· {limpiar(progSel.nombre)}</span>}</div>
+      {progSel ? (
+        <div className="grid cols-2">
+          <div className="card">
+            <div className="card-h"><h2>Motivos de cierre</h2><span className="hint">{n0(progSel.noUtil)} no útiles</span></div>
+            <div className="table-wrap">
+              <table className="data">
+                <thead><tr><th>Motivo <Info>Tipificación con la que el asesor cerró un lead como no útil.<span className="src">NODS · descripcion_sub</span></Info></th><th>Leads</th><th>%</th></tr></thead>
+                <tbody>
+                  {(progSel.motivos || []).map((m, i) => (
+                    <tr key={i}><td>{m.motivo}</td><td>{n0(m.leads)}</td><td>{pct(progSel.noUtil ? (m.leads / progSel.noUtil) * 100 : 0, 0)}</td></tr>
+                  ))}
+                  {!progSel.motivos?.length && <tr><td colSpan={3} className="faint">Sin motivos registrados.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-h"><h2>Embudo del programa</h2></div>
+            <div className="card-b">
+              <Linea k="Leads" v={n0(progSel.total)} info="Total de leads del programa en el período." />
+              <Linea k="Tasa de contacto" v={pct(progSel.contactoPct, 1)} info="Leads con los que se logró hablar ÷ total. Excluye no-contesta, buzón, teléfono erróneo, etc." />
+              <Linea k="Potenciales" v={n0(progSel.potenciales)} info="Leads en proceso de pago (estado transitorio previo a la matrícula)." />
+              <Linea k="Matrículas" v={n0(progSel.matriculados)} info="Inscripciones pagadas del programa." />
+              <Linea k="Conv. lead → matrícula" v={pct(progSel.convLead, 2)} info="Matrículas ÷ leads del programa." />
+              <Linea k="Conv. contacto → matrícula" v={pct(progSel.convContacto, 2)} info="Matrículas ÷ leads contactados. Mide el cierre una vez que se logró el contacto." />
+              <Linea k="Descuento promedio" v={progSel.descuento != null ? pct(progSel.descuento, 1) : '—'} info="Promedio del descuento aplicado en las matrículas del programa." />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="card">
+          <div className="card-b small faint">Elegí un programa en el filtro de arriba para ver sus motivos de cierre y su embudo completo. El desglose por programa de cada tipo está en los bloques de arriba.</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ---------- Bloque de segmento (Másters/GMP o Diplomados) ---------- */
+function SegBlock({ seg, row, obj, detalle, acc, cuenta, icon, tag, periodView }) {
+  const conv = row.leads ? (row.matriculados / row.leads) * 100 : 0
+  const cumpl = obj && obj.matMeta ? (obj.matReal / obj.matMeta) * 100 : null
+  const filas = detalle.filter((p) => p.segmento === seg.id).sort((a, b) => b.matriculados - a.matriculados || b.total - a.total)
+  return (
+    <div className="segblk">
+      <div className="sh" style={{ background: acc }}>
+        <span className="ic">{icon}</span>
+        <span className="nm">{seg.nombre}</span>
+        <span className="tag">{tag}</span>
+      </div>
+      <div className="sb">
+        <div className="mini" style={{ marginBottom: 14 }}>
+          <Mini k="Leads" v={n0(row.leads)} info="Leads del CRM de este tipo de programa en el período." />
+          <Mini k="Matrículas" v={n0(row.matriculados)} info="Inscripciones pagadas de este tipo en el período." />
+          <Mini k="Conversión" v={pct(conv, 2)} info="Matrículas ÷ leads de este tipo." />
+          <Mini k="Cumplimiento" v={cumpl != null ? pct(cumpl, 0) : '—'} sub={obj ? `${n0(obj.matReal)} / ${n0(obj.matMeta)} meta` : null} info="Matrículas reales del ciclo ÷ meta de matrículas del ciclo (no varía con el período)." />
+        </div>
         <div className="table-wrap">
           <table className="data">
             <thead><tr>
-              <th>Programa</th><th>Leads</th><th>Contacto</th><th>Potenc.</th><th>Matrículas</th><th>Conv.</th><th>Descuento</th><th>Motivo de cierre #1</th>
+              <th>Programa</th>
+              <th>Leads</th>
+              <th>Contacto <Info r>Leads contactados ÷ total. Excluye no-contesta, buzón, teléfono erróneo, duplicado.<span className="src">NODS · descripcion_sub</span></Info></th>
+              <th>Potenc. <Info r>Leads en proceso de pago.<span className="src">NODS · descripcion_sub</span></Info></th>
+              <th>Matrículas</th>
+              <th>Conv. <Info r>Matrículas ÷ leads del programa.</Info></th>
+              <th>Descuento <Info r>Descuento promedio aplicado en las matrículas.<span className="src">NODS · matriculas.descuento_aplicado</span></Info></th>
+              <th>Motivo #1 <Info r>Motivo de cierre no útil más frecuente.</Info></th>
             </tr></thead>
             <tbody>
               {filas.map((p, i) => (
@@ -119,43 +220,118 @@ export default function PerformanceView({ cuenta, data, onBack }) {
           </table>
         </div>
       </div>
+    </div>
+  )
+}
 
-      {/* Detalle del programa seleccionado: motivos de cierre completos */}
-      {progSel && (
-        <>
-          <div className="section-title">Motivos de cierre · {limpiar(progSel.nombre)}</div>
-          <div className="grid cols-2">
-            <div className="card">
-              <div className="card-h"><h2>Motivos de cierre</h2><span className="hint">{n0(progSel.noUtil)} cierres</span></div>
-              <div className="table-wrap">
-                <table className="data">
-                  <thead><tr><th>Motivo</th><th>Leads</th><th>%</th></tr></thead>
-                  <tbody>
-                    {(progSel.motivos || []).map((m, i) => (
-                      <tr key={i}><td>{m.motivo}</td><td>{n0(m.leads)}</td><td>{pct(progSel.noUtil ? (m.leads / progSel.noUtil) * 100 : 0, 0)}</td></tr>
-                    ))}
-                    {!progSel.motivos?.length && <tr><td colSpan={3} className="faint">Sin motivos registrados.</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="card">
-              <div className="card-h"><h2>Embudo del programa</h2></div>
-              <div className="card-b">
-                <Linea k="Leads" v={n0(progSel.total)} />
-                <Linea k="Gestionados" v={n0(progSel.gestionados)} />
-                <Linea k="Tasa de contacto" v={pct(progSel.contactoPct, 1)} />
-                <Linea k="Potenciales" v={n0(progSel.potenciales)} />
-                <Linea k="Matrículas" v={n0(progSel.matriculados)} />
-                <Linea k="Conversión lead → matrícula" v={pct(progSel.convLead, 2)} />
-                <Linea k="Conversión contacto → matrícula" v={pct(progSel.convContacto, 2)} />
-                <Linea k="Descuento promedio" v={progSel.descuento != null ? pct(progSel.descuento, 1) : '—'} />
-              </div>
+/* ---------- Cruce creativos → ventas ---------- */
+function CreativosBoard({ crea, invCrea, acc, cuenta, periodView }) {
+  const formatos = crea.formatos || []
+  const angulos = (crea.angulos || []).filter((a) => a.leads > 0)
+  const cob = crea.cobertura || {}
+  const invF = new Map((invCrea.porFormato || []).map((r) => [r.formato, r]))
+
+  if (!angulos.length && !formatos.length) return null
+
+  // Insight automático: mejor ángulo por conversión con volumen real (evita que un
+  // ángulo con pocas matrículas gane por ruido estadístico), y formato ganador.
+  const angConVol = angulos.filter((a) => a.leads >= 100 && a.matriculados >= 10)
+  const mejorAng = [...(angConVol.length ? angConVol : angulos)].sort((a, b) => b.convPct - a.convPct)[0]
+  const masLeadsAng = [...angulos].sort((a, b) => b.leads - a.leads)[0]
+  const fmtConv = formatos.filter((x) => x.formato !== 'Sin dato' && x.leads >= 30)
+  const mejorFmt = [...fmtConv].sort((a, b) => b.convPct - a.convPct)[0]
+
+  return (
+    <>
+      <div className="section-title">Creativos → ventas
+        <Info>Cruzamos el creativo con el que entró cada lead y cada matrícula (codificado en <code>utm_content</code>) para ver qué <b>vende</b>, no sólo qué trae leads. Formato = imagen/video; ángulo = el "perfil del anuncio" (Especialista, Estudioso…).<span className="src">CRM: utm_content · Inversión: Meta Ads ad_name</span></Info>
+      </div>
+
+      {mejorAng && (
+        <div className="callout" style={{ marginBottom: 14 }}>
+          <span className="ic">💡</span>
+          <div>
+            El ángulo <b>{mejorAng.angulo}</b> es el que mejor convierte (<b>{pct(mejorAng.convPct, 2)}</b>, {n0(mejorAng.matriculados)} matrículas){masLeadsAng && masLeadsAng.angulo !== mejorAng.angulo && <> — mientras que <b>{masLeadsAng.angulo}</b> trae más leads ({n0(masLeadsAng.leads)}) pero convierte {pct(masLeadsAng.convPct, 2)}</>}.
+            {mejorFmt && <> En formato, <b>{mejorFmt.formato}</b> lidera la conversión ({pct(mejorFmt.convPct, 2)}).</>}
+          </div>
+        </div>
+      )}
+
+      <div className="grid cols-2">
+        {/* Por formato */}
+        <div className="card">
+          <div className="card-h"><h2>Por formato de anuncio</h2><span className="hint">imagen vs video</span></div>
+          <div className="card-b">
+            <div className="mini" style={{ gridTemplateColumns: `repeat(${Math.min(formatos.length, 3)}, 1fr)` }}>
+              {formatos.map((ff) => {
+                const inv = invF.get(ff.formato)
+                const es = ff.formato === 'Sin dato'
+                return (
+                  <div className="m" key={ff.formato}>
+                    <div className="mk">{es ? 'Sin formato' : ff.formato}
+                      <Info>{es ? 'Creativos cuyo nombre no indica formato.' : `Anuncios en formato ${ff.formato.toLowerCase()}.`} Conversión = matrículas ÷ leads de ese formato.{inv && <span className="src">Inversión {money(inv.inversion, cuenta.moneda)} (mes)</span>}</Info>
+                    </div>
+                    <div className="mv" style={{ color: es ? 'var(--faint)' : acc }}>{pct(ff.convPct, 2)}</div>
+                    <div className="ms">{n0(ff.matriculados)} mat · {n0(ff.leads)} leads</div>
+                    {inv && <div className="ms">Inv {money(inv.inversion, cuenta.moneda)} <span className="faint">(mes)</span></div>}
+                  </div>
+                )
+              })}
             </div>
           </div>
-        </>
-      )}
+        </div>
+
+        {/* Por ángulo */}
+        <div className="card">
+          <div className="card-h"><h2>Por ángulo (perfil del anuncio)</h2><span className="hint">qué mensaje vende</span></div>
+          <div className="card-b">
+            <CBars rows={angulos} acc={acc} />
+            <div className="legend">
+              <span className="li"><span className="sw" style={{ background: acc }} /> largo = leads · intensidad = conversión</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p className="small faint" style={{ marginTop: 8 }}>
+        Cobertura: {n0(cob.leadsConDato)} de {n0(cob.leadsTotal)} leads y {n0(cob.matsConDato)} de {n0(cob.matsTotal)} matrículas traen creativo identificable. La inversión por formato es del mes en curso (Meta); leads y matrículas responden al período.
+      </p>
+    </>
+  )
+}
+
+// Barras de ángulo: largo ∝ leads (audiencia), intensidad de color ∝ conversión.
+function CBars({ rows, acc }) {
+  const maxLeads = Math.max(...rows.map((r) => r.leads), 1)
+  const maxConv = Math.max(...rows.map((r) => r.convPct), 0.0001)
+  const { r, g, b } = hexRgb(acc)
+  return (
+    <div className="cvz">
+      {rows.map((row) => {
+        const w = Math.max(6, (row.leads / maxLeads) * 100)
+        const op = 0.32 + 0.68 * (row.convPct / maxConv)
+        return (
+          <div className="crow" key={row.angulo}>
+            <div className="cname">{row.angulo}</div>
+            <div className="ctrack">
+              <div className="cfill" style={{ width: `${w}%`, background: `rgba(${r},${g},${b},${op.toFixed(3)})` }} />
+              <span className="cconv" style={{ color: w > 62 ? '#fff' : 'var(--ink)' }}>{pct(row.convPct, 2)}</span>
+            </div>
+            <div className="cval"><b>{n0(row.matriculados)}</b> mat · {n0(row.leads)} leads</div>
+          </div>
+        )
+      })}
     </div>
+  )
+}
+
+/* ---------- Átomos ---------- */
+function Info({ children, r }) {
+  return (
+    <span className={'info' + (r ? ' r' : '')}>
+      <button type="button" className="q" aria-label="Qué es esta métrica">?</button>
+      <span className="bub" role="tooltip">{children}</span>
+    </span>
   )
 }
 
@@ -165,18 +341,28 @@ function BackBar({ cuenta, onBack }) {
       <div>
         <button className="btn" onClick={onBack} style={{ marginBottom: 10 }}>← Volver al tablero</button>
         <h1>📊 Performance</h1>
-        <div className="sub">{cuenta.nombre} · rendimiento por programa</div>
+        <div className="sub">{cuenta.nombre} · rendimiento por tipo, programa y creativo</div>
       </div>
     </div>
   )
 }
 
-function Kpi({ lbl, val, sub }) {
+function Kpi({ lbl, val, sub, info }) {
   return (
     <div className="card kpi">
-      <div className="lbl">{lbl}</div>
+      <div className="lbl">{lbl}{info && <Info>{info}</Info>}</div>
       <div className="val small">{val}</div>
       {sub && <div className="delta faint">{sub}</div>}
+    </div>
+  )
+}
+
+function Mini({ k, v, sub, info }) {
+  return (
+    <div className="m">
+      <div className="mk">{k}{info && <Info>{info}</Info>}</div>
+      <div className="mv">{v}</div>
+      {sub && <div className="ms">{sub}</div>}
     </div>
   )
 }
@@ -192,11 +378,21 @@ function Meter({ titulo, real, meta, pct: p, acc }) {
   )
 }
 
-function Linea({ k, v }) {
-  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderTop: '1px solid var(--line)', fontSize: 13 }}><span className="muted">{k}</span><b>{v}</b></div>
+function Linea({ k, v, info }) {
+  return <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderTop: '1px solid var(--line)', fontSize: 13 }}><span className="muted">{k}{info && <Info>{info}</Info>}</span><b>{v}</b></div>
 }
 
 const limpiar = (nombre) => String(nombre).replace(/^(Master|Diplomado|GMP|DIPLOMADO)\s*[-–]\s*/i, '').trim()
 function mesLabel(yyyymm) {
   try { const s = new Date(yyyymm + '-01T00:00:00').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1) } catch { return yyyymm }
+}
+function hexRgb(hex) {
+  const n = parseInt(String(hex).replace('#', ''), 16)
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
+}
+// Tono más apagado del acento, para diferenciar el bloque de diplomados.
+function mezcla(hex) {
+  const { r, g, b } = hexRgb(hex)
+  const m = (c) => Math.round(c * 0.55 + 90 * 0.45)
+  return `rgb(${m(r)},${m(g)},${m(b)})`
 }

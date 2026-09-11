@@ -125,7 +125,7 @@ export default function AccountView({ cuenta }) {
         </div>
         <div className="spacer" />
         <button className="btn" onClick={() => setVista('organico')} disabled={!data} title="Alcance orgánico: adquisición sin pauta" style={{ borderColor: '#2E9E6B', color: '#227A52' }}>🌱 Alcance orgánico</button>
-        <button className="btn" onClick={() => setVista('performance')} disabled={!data} title="Performance por programa, objetivos y pauta" style={{ borderColor: cuenta.acento, color: cuenta.acento }}>📊 Performance</button>
+        <button className="btn" onClick={() => setVista('performance')} disabled={!data} title="Performance: tipo de programa, objetivos y creativos que venden" style={{ borderColor: cuenta.acento, color: cuenta.acento }}>📊 Performance</button>
         <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)">{refrescando ? '⏳ Actualizando…' : '⟳ Actualizar datos'}</button>
         <button className="btn primary" onClick={() => setShowReport(true)} disabled={!data}>Generar reporte</button>
       </div>

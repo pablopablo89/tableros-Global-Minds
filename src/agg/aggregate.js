@@ -55,6 +55,37 @@ function parseDescuento(raw) {
   return v
 }
 
+// El "creativo" de un lead/matrícula/ad se codifica en utm_content / content / ad_name
+// como {TIPO}_{Programa}_{FORMATO}_{Ángulo} (con mucha variación entre cuentas y typos).
+// Extraemos dos dimensiones robustas y comparables entre las tres fuentes:
+//   · formato: Video / Imagen / GIF / Carrusel / Sin dato
+//   · ángulo (perfil del anuncio): Especialista / Desbravador / Ambicioso / Estudioso /
+//     Docente / Testimonial / Texto / Genérico   (igual que el "Perfil del anuncio" de NODS)
+// baja + sin acentos + separadores (_ . - etc.) a espacios, para que \b funcione.
+const _cnorm = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ')
+const PERSONAS = [
+  [/especialist/, 'Especialista'],
+  [/desbravad/, 'Desbravador'],
+  [/ambicios/, 'Ambicioso'],
+  [/estudios|estudiant/, 'Estudioso'],
+  [/docent/, 'Docente'],
+  [/testimoni/, 'Testimonial'],
+  [/\btexto\b|kvv texto/, 'Texto'],
+]
+function parseCreativo(raw) {
+  const s = _cnorm(raw).trim()
+  if (!s) return null
+  let formato = 'Sin dato'
+  if (/\b(video|reel|vid)\b/.test(s)) formato = 'Video'
+  else if (/\b(img|imagen|imagenes|estatic|static|foto)\b/.test(s)) formato = 'Imagen'
+  else if (/\bgif\b/.test(s)) formato = 'GIF'
+  else if (/\b(carrusel|carousel)\b/.test(s)) formato = 'Carrusel'
+  let angulo = 'Genérico'
+  for (const [re, label] of PERSONAS) if (re.test(s)) { angulo = label; break }
+  return { formato, angulo }
+}
+const FORMATO_ORDEN = { Video: 0, Imagen: 1, GIF: 2, Carrusel: 3, 'Sin dato': 9 }
+
 // Clave normalizada para fusionar el MISMO programa escrito distinto en
 // consulta_base vs matriculas (acentos, mayúsculas, espacios dobles).
 const STOP = new Set(['y', 'e', 'o', 'u', 'de', 'del', 'la', 'el', 'los', 'las', 'en', 'con', 'para', 'por', 'a', 'al', 'un', 'una', 'the'])
@@ -103,6 +134,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   // ---------- Leads (consulta_base) ----------
   const leads = consultaBase.map((l) => {
     const ch = clasificarCanal(l.utm_source, l.utm_medium)
+    const cr = parseCreativo(l.utm_content)
     return {
       seg: segmentoDe(l.txtprogramainteres, cfg),
       programa: norm(l.txtprogramainteres),
@@ -113,18 +145,24 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
       fecha: l.fecha_insercion || l.ts,
       macro: ch.macro, canal: ch.canal, fuente: fuenteLabel(l.utm_source, l.utm_medium),
       srcRaw: norm(l.utm_source), medRaw: norm(l.utm_medium),
+      creaFormato: cr ? cr.formato : null, creaAngulo: cr ? cr.angulo : null,
     }
   })
 
   // ---------- Matrículas ----------
   const mats = matriculas.map((m) => {
-    let src = m.source, med = m.medium
-    if (vacioCanal(src) && vacioCanal(med)) {
+    let src = m.source, med = m.medium, cont = m.content
+    if ((vacioCanal(src) && vacioCanal(med)) || vacioCanal(cont)) {
       const hit = idxMail.get(nMail(m.correo)) || idxTel.get(nTel(m.telefono))
-      if (hit) { src = hit.utm_source; med = hit.utm_medium }
+      if (hit) {
+        if (vacioCanal(src) && vacioCanal(med)) { src = hit.utm_source; med = hit.utm_medium }
+        if (vacioCanal(cont)) cont = hit.utm_content
+      }
     }
     const ch = clasificarCanal(src, med)
+    const cr = parseCreativo(cont)
     return {
+      creaFormato: cr ? cr.formato : null, creaAngulo: cr ? cr.angulo : null,
       seg: segmentoDe(m.programa, cfg),
       programa: norm(m.programa),
       tipo: norm(m.tipo_programa),
@@ -139,7 +177,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   })
 
   // ---------- Núcleo (funnel/segmentos/programas/ciudades/tipificaciones/ticket/ingresos) ----------
-  const { funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos } = nucleo(leads, mats, cfg)
+  const { funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos, creativos } = nucleo(leads, mats, cfg)
 
   // ---------- Metas / inversión (objetivos + meta) ----------
   const metas = construirMetas(objetivos, meta, mats, leads, cfg)
@@ -170,7 +208,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
     fechaCorte: new Date().toISOString().slice(0, 10),
     cuenta: cfg.id,
     moneda: cfg.moneda,
-    funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos, metas, leadsSemana, daily, cohortes, semanal, mensual, ventasMes, organico, performance,
+    funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos, creativos, metas, leadsSemana, daily, cohortes, semanal, mensual, ventasMes, organico, performance,
     cobertura: { leads: leads.length, matriculas: mats.length },
   }
 }
@@ -409,7 +447,47 @@ function nucleo(leads, mats, cfg) {
   const ingresos = { total: mats.reduce((a, m) => a + m.precio, 0), porSegmento: {} }
   for (const s of cfg.segmentos) ingresos.porSegmento[s.id] = mats.filter((m) => m.seg === s.id).reduce((a, m) => a + m.precio, 0)
 
-  return { funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos, cobertura: { leads: leads.length, matriculas: mats.length } }
+  const creativos = construirCreativos(leads, mats)
+
+  return { funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos, creativos, cobertura: { leads: leads.length, matriculas: mats.length } }
+}
+
+// Cruce CREATIVOS → VENTAS (sólo CRM: completo y sin ventana). Reparte los leads y
+// las matrículas que traen creativo (utm_content / content) por FORMATO y por ÁNGULO
+// (perfil del anuncio), y mide la conversión lead→matrícula de cada uno. Responde bien
+// a la pregunta "qué creativo VENDE, no sólo cuál trae leads".
+function construirCreativos(leads, mats) {
+  const conL = leads.filter((l) => l.creaFormato)
+  const conM = mats.filter((m) => m.creaFormato)
+  const grupo = (arrL, arrM, campo) => {
+    const map = new Map()
+    const row = (k) => { if (!map.has(k)) map.set(k, { clave: k, leads: 0, contacto: 0, potenciales: 0, matriculados: 0 }); return map.get(k) }
+    for (const l of arrL) { const r = row(l[campo]); r.leads++; if (esContactado(l.sub)) r.contacto++; if (POTENCIAL.has(l.sub)) r.potenciales++ }
+    for (const m of arrM) row(m[campo]).matriculados++
+    return [...map.values()].map((r) => ({
+      ...r,
+      contactoPct: r.leads ? (r.contacto / r.leads) * 100 : 0,
+      convPct: r.leads ? (r.matriculados / r.leads) * 100 : 0,
+    }))
+  }
+  const formatos = grupo(conL, conM, 'creaFormato')
+    .map((r) => ({ formato: r.clave, ...r }))
+    .sort((a, b) => (FORMATO_ORDEN[a.formato] ?? 8) - (FORMATO_ORDEN[b.formato] ?? 8))
+  const angulos = grupo(conL, conM, 'creaAngulo')
+    .map((r) => ({ angulo: r.clave, ...r }))
+    .sort((a, b) => b.matriculados - a.matriculados || b.leads - a.leads)
+  // Matriz formato × ángulo (celdas con al menos 1 matrícula o buen volumen de leads).
+  const cMap = new Map()
+  const cRow = (f, a) => { const k = f + '||' + a; if (!cMap.has(k)) cMap.set(k, { formato: f, angulo: a, leads: 0, matriculados: 0 }); return cMap.get(k) }
+  for (const l of conL) cRow(l.creaFormato, l.creaAngulo).leads++
+  for (const m of conM) cRow(m.creaFormato, m.creaAngulo).matriculados++
+  const combos = [...cMap.values()]
+    .map((c) => ({ ...c, convPct: c.leads ? (c.matriculados / c.leads) * 100 : 0 }))
+    .sort((a, b) => b.matriculados - a.matriculados || b.leads - a.leads)
+  return {
+    formatos, angulos, combos,
+    cobertura: { leadsConDato: conL.length, leadsTotal: leads.length, matsConDato: conM.length, matsTotal: mats.length },
+  }
 }
 
 // Un slice de `nucleo` por cada semana (lun-dom) del ciclo, para el filtro semanal.
@@ -592,6 +670,19 @@ function construirPerformance(meta, metas) {
   const adsPorPrograma = [...pmap.values()]
     .map((p) => ({ ...p, key: normKey(p.nombre), cpl: p.leadsAds ? p.inversion / p.leadsAds : null }))
     .sort((a, b) => b.inversion - a.inversion)
+
+  // Inversión real por FORMATO y por ÁNGULO (parseando ad_name), para superponerla al
+  // cruce creativos→ventas del CRM. Cubre la ventana descargada de Meta (mes en curso).
+  const invF = new Map(), invA = new Map()
+  const acc = (map, k) => { if (!map.has(k)) map.set(k, { inversion: 0, leadsAds: 0 }); return map.get(k) }
+  for (const r of meta) {
+    if (!r.ad_name) continue
+    const cr = parseCreativo(r.ad_name)
+    const f = acc(invF, cr.formato); f.inversion += num(r.amount_spent); f.leadsAds += num(r.registration_completed)
+    const a = acc(invA, cr.angulo); a.inversion += num(r.amount_spent); a.leadsAds += num(r.registration_completed)
+  }
+  const invRows = (map, campo) => [...map.entries()].map(([k, v]) => ({ [campo]: k, inversion: v.inversion, leadsAds: v.leadsAds, cpl: v.leadsAds ? v.inversion / v.leadsAds : null }))
+
   const v = metas.inversionVentana
   return {
     ads: {
@@ -602,6 +693,7 @@ function construirPerformance(meta, metas) {
       ventana: metas.coberturaInversion,
     },
     adsPorPrograma,
+    inversionCreativos: { porFormato: invRows(invF, 'formato'), porAngulo: invRows(invA, 'angulo'), ventana: metas.coberturaInversion },
     objetivos: { matriculas: metas.matriculas, leads: metas.leads, porSegmento: metas.porSegmento },
   }
 }
