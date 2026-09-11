@@ -1,4 +1,4 @@
-import { n0, n2, pct, money } from '../lib/format.js'
+import { n0, pct, money, fechaCorta } from '../lib/format.js'
 
 /* ================= Gauge (dona) de cumplimiento ================= */
 // Semicírculo: fondo gris + arco de avance. % grande en el centro.
@@ -147,7 +147,75 @@ export function Demografia({ demo, acc, moneda }) {
   )
 }
 
+/* ================= Pauta Meta: inversión (barras) + CPL (línea) por semana ================= */
+export function MetaSerie({ serie, acc, moneda }) {
+  const s = (serie || []).filter((x) => x.inversion > 0 || x.leadsAds > 0)
+  if (!s.length) return <div className="card"><div className="card-b faint small">Sin datos de pauta del ciclo.</div></div>
+  const W = 600, H = 240, padL = 54, padR = 56, padT = 16, padB = 40
+  const invMax = Math.max(...s.map((x) => x.inversion), 1)
+  const cplMax = Math.max(...s.map((x) => x.cpl || 0), 0.01)
+  const bw = (W - padL - padR) / s.length
+  const xC = (i) => padL + bw * i + bw / 2
+  const yInv = (v) => (H - padB) - (v / invMax) * (H - padT - padB)
+  const yCpl = (v) => (H - padB) - (v / cplMax) * (H - padT - padB)
+  const lin = s.map((p, i) => `${i ? 'L' : 'M'}${xC(i).toFixed(1)},${yCpl(p.cpl || 0).toFixed(1)}`).join(' ')
+  const step = Math.max(1, Math.ceil(s.length / 10))
+  const totInv = s.reduce((a, x) => a + x.inversion, 0)
+  const totLeads = s.reduce((a, x) => a + x.leadsAds, 0)
+  return (
+    <div className="card">
+      <div className="card-h"><h2>Inversión y CPL por semana</h2><span className="hint">{money(totInv, moneda)} · {n0(totLeads)} leads · CPL {money(totLeads ? totInv / totLeads : 0, moneda)}</span></div>
+      <div className="card-b"><div className="table-wrap">
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%' }} role="img" aria-label="Inversión y CPL por semana">
+          {[0, 0.5, 1].map((fr, i) => { const v = invMax * fr; return <g key={i}><line x1={padL} x2={W - padR} y1={yInv(v)} y2={yInv(v)} stroke="var(--line)" /><text x={padL - 6} y={yInv(v) + 3} textAnchor="end" fontSize="8.5" fill="var(--faint)">{money(v, moneda)}</text></g> })}
+          {[0, cplMax].map((v, i) => <text key={'c' + i} x={W - padR + 6} y={yCpl(v) + 3} fontSize="8.5" fill="var(--ink)">{money(v, moneda)}</text>)}
+          {s.map((p, i) => { const h = (H - padB) - yInv(p.inversion); return <rect key={i} x={xC(i) - bw * 0.32} y={yInv(p.inversion)} width={bw * 0.64} height={Math.max(0, h)} rx="2" fill={acc} opacity="0.8" /> })}
+          <path d={lin} fill="none" stroke="var(--ink)" strokeWidth="2" />
+          {s.map((p, i) => p.cpl != null ? <circle key={'d' + i} cx={xC(i)} cy={yCpl(p.cpl)} r="2.6" fill="var(--ink)" /> : null)}
+          {s.map((p, i) => (i % step === 0 ? <text key={'x' + i} x={xC(i)} y={H - 22} textAnchor="middle" fontSize="8" fill="var(--faint)">{fechaCorta(p.semana)}</text> : null))}
+          <text x={padL} y={H - 6} fontSize="8" fill="var(--faint)">barras: inversión (izq) · línea: CPL (der)</text>
+        </svg>
+      </div></div>
+    </div>
+  )
+}
+
+/* ================= Programa × semana (CPL) ================= */
+export function ProgramaSemana({ data, moneda, selKey }) {
+  const semanas = (data?.semanas || []).filter((w) => (data.programas || []).some((p) => p.semanas[w]))
+  let progs = data?.programas || []
+  if (selKey) progs = progs.filter((p) => p.key === selKey)
+  progs = progs.filter((p) => p.totLeads > 0)
+  if (!progs.length || !semanas.length) return <div className="card"><div className="card-b faint small">Sin datos de pauta por programa.</div></div>
+  const cplCol = (() => { // escala de color por CPL (verde barato → rojo caro)
+    const all = []; for (const p of progs) for (const w of semanas) if (p.semanas[w]?.cpl != null) all.push(p.semanas[w].cpl)
+    const mn = Math.min(...all, 0), mx = Math.max(...all, 1)
+    return (v) => { if (v == null) return 'transparent'; const t = mx > mn ? (v - mn) / (mx - mn) : 0; const r = Math.round(120 + t * 110), g = Math.round(180 - t * 110); return `rgba(${r},${g},90,0.28)` }
+  })()
+  return (
+    <div className="card">
+      <div className="card-h"><h2>CPL por programa y semana</h2><span className="hint">color: barato → caro</span></div>
+      <div className="table-wrap">
+        <table className="data" style={{ fontSize: 12 }}>
+          <thead><tr><th>Programa</th>{semanas.map((w) => <th key={w}>{fechaCorta(w)}</th>)}<th>Total</th></tr></thead>
+          <tbody>
+            {progs.map((p, i) => (
+              <tr key={i}>
+                <td title={p.nombre}>{limpiarNom(p.nombre)}</td>
+                {semanas.map((w) => { const c = p.semanas[w]; return <td key={w} style={{ background: c ? cplCol(c.cpl) : 'transparent' }}>{c && c.cpl != null ? money(c.cpl, moneda) : '·'}</td> })}
+                <td><b>{p.cpl != null ? money(p.cpl, moneda) : '—'}</b></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="card-b small faint" style={{ paddingTop: 10 }}>Cada celda = costo por lead de ese programa en esa semana (inversión ÷ leads de pauta). Total = CPL del ciclo.</div>
+    </div>
+  )
+}
+
 /* helpers */
+const limpiarNom = (n) => String(n).replace(/^(Master|Diplomado|GMP|DIPLOMADO)\s*[-–]\s*/i, '').trim()
 const ORDEN = { Video: 0, Imagen: 1, GIF: 2, Carrusel: 3, 'Sin dato': 9 }
 const ORD = (f) => (ORDEN[f] ?? 8)
 function hexRgb(hex) { const n = parseInt(String(hex).replace('#', ''), 16); return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 } }

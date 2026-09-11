@@ -180,7 +180,8 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   const { funnel, segmentos, programas, programasDetalle, ciudades, tipificaciones, ticket, descuento, ingresos, creativos } = nucleo(leads, mats, cfg)
 
   // ---------- Metas / inversión (objetivos + meta) ----------
-  const metas = construirMetas(objetivos, meta, mats, leads, cfg)
+  const metaU = dedupeMeta(meta) // quita filas repetidas por el fetch mes-a-mes
+  const metas = construirMetas(objetivos, metaU, mats, leads, cfg)
 
   // ---------- Leads por semana ----------
   const leadsSemana = construirLeadsSemana(leads, cfg)
@@ -202,7 +203,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   const organico = construirOrganico(leads, mats, cfg)
 
   // ---------- Performance (ads: inversión/alcance/CPL + cumplimiento de objetivos) ----------
-  const performance = construirPerformance(meta, metas)
+  const performance = construirPerformance(metaU, metas, cfg)
 
   return {
     fechaCorte: new Date().toISOString().slice(0, 10),
@@ -543,6 +544,64 @@ function descuentoPromedio(mats, cfg) {
   }
 }
 
+// Series ANUALES de pauta (Meta, todos los meses del ciclo, una sola descomposición):
+//  · serie: inversión / leads-ads / CPL por semana (lun-dom)
+//  · formatoCampana: Formulario nativo / Click to Web / Search (parseando campaign_name)
+//  · programaSemana: matriz programa × semana con leads y CPL
+function construirMetaSerie(base, cfg) {
+  const num = (v) => Number(v) || 0
+  // --- semanal ---
+  const wMap = new Map()
+  const wRow = (k) => { if (!wMap.has(k)) wMap.set(k, { semana: k, inversion: 0, leadsAds: 0, impresiones: 0, clics: 0 }); return wMap.get(k) }
+  for (const r of base) {
+    if (!r.fecha) continue
+    const wk = lunesISO(r.fecha); if (!/^\d{4}-\d{2}-\d{2}$/.test(wk)) continue
+    const s = wRow(wk)
+    s.inversion += num(r.amount_spent); s.leadsAds += num(r.registration_completed)
+    s.impresiones += num(r.impresions); s.clics += num(r.outbound_clics)
+  }
+  const serie = [...wMap.values()].sort((a, b) => a.semana.localeCompare(b.semana))
+    .map((s) => ({ ...s, fin: finSemana(s.semana), cpl: s.leadsAds ? s.inversion / s.leadsAds : null }))
+  // --- formato de campaña ---
+  const clasifFmt = (name) => {
+    const s = norm(name).toLowerCase().replace(/[^a-z0-9]+/g, ' ') // separadores → espacios (para \b)
+    if (/formnativo|form nativo|nativo|lead ?ad|leadgen/.test(s)) return 'Formulario nativo'
+    if (/\bctw\b|click to web|link clicks?|\btrafico\b|to web/.test(s)) return 'Click to Web'
+    if (/\bsearch\b|busqueda|\bsem\b/.test(s)) return 'Search'
+    return 'Otro'
+  }
+  const fMap = new Map()
+  for (const r of base) {
+    const k = clasifFmt(r.campaign_name)
+    if (!fMap.has(k)) fMap.set(k, { formato: k, inversion: 0, leadsAds: 0 })
+    const x = fMap.get(k); x.inversion += num(r.amount_spent); x.leadsAds += num(r.registration_completed)
+  }
+  const ordF = { 'Formulario nativo': 0, 'Click to Web': 1, Search: 2, Otro: 9 }
+  const formatoCampana = [...fMap.values()].map((x) => ({ ...x, cpl: x.leadsAds ? x.inversion / x.leadsAds : null }))
+    .sort((a, b) => (ordF[a.formato] ?? 8) - (ordF[b.formato] ?? 8))
+  // --- programa × semana ---
+  const pMap = new Map()
+  for (const r of base) {
+    const nombre = norm(r.programa); if (!nombre) continue
+    if (!r.fecha) continue
+    const wk = lunesISO(r.fecha); if (!/^\d{4}-\d{2}-\d{2}$/.test(wk)) continue
+    const k = normKey(nombre)
+    if (!pMap.has(k)) pMap.set(k, { nombre, key: k, seg: segmentoDe(nombre, cfg), cel: new Map(), inv: 0, leads: 0 })
+    const p = pMap.get(k)
+    const c = p.cel.get(wk) || { inv: 0, leads: 0 }
+    c.inv += num(r.amount_spent); c.leads += num(r.registration_completed); p.cel.set(wk, c)
+    p.inv += num(r.amount_spent); p.leads += num(r.registration_completed)
+  }
+  const semanas = serie.map((s) => s.semana)
+  const programas = [...pMap.values()].sort((a, b) => b.leads - a.leads).map((p) => ({
+    nombre: p.nombre, key: p.key, seg: p.seg, totLeads: p.leads, totInv: p.inv,
+    cpl: p.leads ? p.inv / p.leads : null,
+    semanas: Object.fromEntries([...p.cel.entries()].map(([w, c]) => [w, { leads: c.leads, cpl: c.leads ? c.inv / c.leads : null }])),
+  }))
+  return { serie, formatoCampana, programaSemana: { semanas, programas } }
+}
+function finSemana(lunesStr) { const d = new Date(lunesStr + 'T00:00:00'); d.setDate(d.getDate() + 6); return d.toISOString().slice(0, 10) }
+
 // Mapea el formato_programa de objetivos ("Masters"/"Diplomados"/"GMP") a segmento.
 function formatoASeg(formato, cfg) {
   const f = norm(formato).toLowerCase()
@@ -651,6 +710,17 @@ function fusionarDetalle(entries) {
 // Meta Ads devuelve VARIAS descomposiciones de la MISMA campaña (breakdown_type:
 // platform/placement/age_gender/country/region). Cada una reparte el mismo gasto →
 // sumar todas multiplica la inversión. Para totales usamos UNA sola descomposición.
+// Las llamadas mes-a-mes de Meta pueden solaparse (devolver filas repetidas). Cada fila
+// trae un `dedup_key` único por (breakdown, anuncio, fecha, plataforma) → deduplicamos.
+function dedupeMeta(meta) {
+  const seen = new Set(); const out = []
+  for (const r of meta) {
+    const k = r.dedup_key || `${r.breakdown_type}|${r.ad_id}|${r.fecha}|${r.publisher_platform}|${r.age}|${r.gender}`
+    if (seen.has(k)) continue
+    seen.add(k); out.push(r)
+  }
+  return out
+}
 function baseMeta(meta) {
   const types = new Set(meta.map((r) => r.breakdown_type).filter(Boolean))
   if (!types.size) return meta // data vieja sin breakdown → una sola copia
@@ -661,7 +731,7 @@ function baseMeta(meta) {
 // Performance de pauta desde `meta` (Meta Ads, granular): agrega inversión, alcance
 // (reach), impresiones, clics y leads de ads (global y por programa), y el cumplimiento
 // de objetivos de matrículas. La inversión cubre la ventana descargada (mes en curso).
-function construirPerformance(meta, metas) {
+function construirPerformance(meta, metas, cfg) {
   const num = (v) => Number(v) || 0
   const base = baseMeta(meta) // una sola descomposición para no multiplicar el gasto
   const ads = { inversion: 0, impresiones: 0, alcance: 0, clics: 0, leadsAds: 0 }
@@ -697,8 +767,12 @@ function construirPerformance(meta, metas) {
   const invRows = (map, campo) => [...map.entries()].map(([k, v]) => ({ [campo]: k, inversion: v.inversion, leadsAds: v.leadsAds, cpl: v.leadsAds ? v.inversion / v.leadsAds : null }))
 
   const demografia = construirDemografia(meta)
+  const metaSerie = construirMetaSerie(base, cfg)
   const v = metas.inversionVentana
   return {
+    serie: metaSerie.serie,
+    formatoCampana: metaSerie.formatoCampana,
+    programaSemana: metaSerie.programaSemana,
     ads: {
       ...ads,
       cpl: ads.leadsAds ? ads.inversion / ads.leadsAds : null,      // CPL sobre leads reportados por Meta

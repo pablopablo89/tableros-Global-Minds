@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { n0, pct, money, fechaCorta } from '../lib/format.js'
 import DailyChart from './DailyChart.jsx'
-import { Gauge, MatrizCreativos, Demografia } from './PerfCharts.jsx'
+import { Gauge, MatrizCreativos, Demografia, MetaSerie, ProgramaSemana } from './PerfCharts.jsx'
 
 // Peso comercial de un Máster/GMP en "unidades equivalentes" de diplomado.
 const PESO_PREMIUM = 2.5
@@ -85,13 +85,38 @@ export default function PerformanceView({ cuenta, data, onBack }) {
         <Kpi lbl="Leads" val={n0(f.leadsTotales)} info={<>Leads cargados en el CRM (consulta_base) dentro del período elegido.<span className="src">Fuente: NODS · consulta_base</span></>} />
         <Kpi lbl="Matrículas" val={n0(f.matriculados)} info={<>Inscripciones pagadas en el período.<span className="src">Fuente: NODS · matriculas</span></>} />
         <Kpi lbl="Conversión" val={pct(convGlobal, 2)} info={<>Matrículas ÷ leads del período. Cuántos de cada 100 leads terminan matriculados.<span className="src">Cálculo: matrículas / leads</span></>} />
-        <Kpi lbl="Inversión Meta" val={money(ads.inversion, cuenta.moneda)} info={<>Gasto en Meta Ads de la ventana descargada (<b>mes en curso</b>). No cambia con el filtro de período.<span className="src">Fuente: Meta Ads · amount_spent</span></>} />
-        <Kpi lbl="CPL global" val={ads.cplReal != null ? money(ads.cplReal, cuenta.moneda) : '—'} info={<>Costo por lead: inversión de la ventana ÷ leads reales de esa ventana.<span className="src">Cálculo: inversión / leads (ventana Meta)</span></>} />
-        <Kpi lbl="Alcance" val={ads.alcance ? n0(ads.alcance) : '—'} sub={ads.impresiones ? `${n0(ads.impresiones)} impresiones` : null} info={<>Personas únicas alcanzadas por la pauta en la ventana de Meta.<span className="src">Fuente: Meta Ads · reach</span></>} />
+        <Kpi lbl="Inversión Meta" val={money(ads.inversion, cuenta.moneda)} info={<>Gasto total en Meta Ads del ciclo. Una sola descomposición de Meta (no multiplica el gasto). No cambia con el filtro de período.<span className="src">Fuente: Meta Ads · amount_spent</span></>} />
+        <Kpi lbl="CPL global" val={ads.cpl != null ? money(ads.cpl, cuenta.moneda) : '—'} info={<>Costo por lead de pauta: inversión ÷ leads reportados por Meta (registration_completed) del ciclo.<span className="src">Cálculo: inversión / leads de ads</span></>} />
+        <Kpi lbl="Alcance" val={ads.alcance ? n0(ads.alcance) : '—'} sub={ads.impresiones ? `${n0(ads.impresiones)} impresiones` : null} info={<>Personas alcanzadas por la pauta (con solapamiento entre plataformas).<span className="src">Fuente: Meta Ads · reach</span></>} />
       </div>
       <p className="small faint" style={{ marginTop: 8 }}>
-        Inversión, CPL, alcance e impresiones vienen de Meta Ads y cubren {ads.ventana ? <>la ventana <b>{fechaCorta(ads.ventana.desde)}–{fechaCorta(ads.ventana.hasta)}</b> (mes en curso)</> : 'el mes en curso'}; no se mueven con el filtro de período. Leads, matrículas y conversión sí responden al período.
+        Inversión, CPL, alcance e impresiones vienen de Meta Ads y cubren {ads.ventana ? <>el ciclo <b>{fechaCorta(ads.ventana.desde)}–{fechaCorta(ads.ventana.hasta)}</b></> : 'todo el ciclo'}; no se mueven con el filtro de período. Leads, matrículas y conversión sí responden al período.
       </p>
+
+      {/* ===== Pauta (Meta Ads) ===== */}
+      <div className="section-title">Pauta · Meta Ads
+        <Info>Rendimiento de la inversión en Meta a lo largo del ciclo: gasto y costo por lead semana a semana, por tipo de campaña y por programa.<span className="src">Fuente: Meta Ads (todos los meses del ciclo)</span></Info>
+      </div>
+      <div className="grid cols-2" style={{ alignItems: 'start' }}>
+        <MetaSerie serie={perf.serie} acc={acc} moneda={cuenta.moneda} />
+        <div className="card">
+          <div className="card-h"><h2>Por formato de campaña</h2><span className="hint">cómo se pauta</span></div>
+          <div className="card-b">
+            <div className="mini" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              {(perf.formatoCampana || []).filter((x) => x.leadsAds > 0 || x.inversion > 0).map((x) => (
+                <div className="m" key={x.formato}>
+                  <div className="mk">{x.formato}<Info>{fmtCampInfo(x.formato)} CPL = inversión ÷ leads de ads. En Click to Web la conversión ocurre fuera de Meta, por eso no reporta leads.<span className="src">Meta Ads · campaign_name</span></Info></div>
+                  <div className="mv" style={{ fontSize: 20 }}>{x.leadsAds >= 10 && x.cpl != null ? money(x.cpl, cuenta.moneda) : '—'}</div>
+                  <div className="ms">{n0(x.leadsAds)} leads · {money(x.inversion, cuenta.moneda)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{ marginTop: 14 }}>
+        <ProgramaSemana data={perf.programaSemana} moneda={cuenta.moneda} selKey={prog !== 'todos' ? prog : null} />
+      </div>
 
       {/* ===== GMP/Másters vs Diplomados, separados ===== */}
       <div className="section-title">Por tipo de programa
@@ -146,7 +171,7 @@ export default function PerformanceView({ cuenta, data, onBack }) {
       {/* ===== Demografía de la pauta ===== */}
       {perf.demografia && <>
         <div className="section-title">Rendimiento demográfico
-          <Info>Género y edad de las personas alcanzadas por la pauta, con su costo por lead. Del desglose demográfico de Meta Ads (mes en curso).<span className="src">Meta Ads · breakdown age_gender</span></Info>
+          <Info>Género y edad de las personas alcanzadas por la pauta, con su costo por lead. Del desglose demográfico de Meta Ads (ciclo).<span className="src">Meta Ads · breakdown age_gender</span></Info>
         </div>
         <Demografia demo={perf.demografia} acc={acc} moneda={cuenta.moneda} />
       </>}
@@ -289,11 +314,11 @@ function CreativosBoard({ crea, invCrea, acc, cuenta, periodView }) {
                 return (
                   <div className="m" key={ff.formato}>
                     <div className="mk">{es ? 'Sin formato' : ff.formato}
-                      <Info>{es ? 'Creativos cuyo nombre no indica formato.' : `Anuncios en formato ${ff.formato.toLowerCase()}.`} Conversión = matrículas ÷ leads de ese formato.{inv && <span className="src">Inversión {money(inv.inversion, cuenta.moneda)} (mes)</span>}</Info>
+                      <Info>{es ? 'Creativos cuyo nombre no indica formato.' : `Anuncios en formato ${ff.formato.toLowerCase()}.`} Conversión = matrículas ÷ leads de ese formato.{inv && <span className="src">Inversión {money(inv.inversion, cuenta.moneda)} (ciclo)</span>}</Info>
                     </div>
                     <div className="mv" style={{ color: es ? 'var(--faint)' : acc }}>{pct(ff.convPct, 2)}</div>
                     <div className="ms">{n0(ff.matriculados)} mat · {n0(ff.leads)} leads</div>
-                    {inv && <div className="ms">Inv {money(inv.inversion, cuenta.moneda)} <span className="faint">(mes)</span></div>}
+                    {inv && <div className="ms">Inv {money(inv.inversion, cuenta.moneda)} <span className="faint">(ciclo)</span></div>}
                   </div>
                 )
               })}
@@ -324,7 +349,7 @@ function CreativosBoard({ crea, invCrea, acc, cuenta, periodView }) {
       )}
 
       <p className="small faint" style={{ marginTop: 8 }}>
-        Cobertura: {n0(cob.leadsConDato)} de {n0(cob.leadsTotal)} leads y {n0(cob.matsConDato)} de {n0(cob.matsTotal)} matrículas traen creativo identificable. La inversión por formato es del mes en curso (Meta); leads y matrículas responden al período.
+        Cobertura: {n0(cob.leadsConDato)} de {n0(cob.leadsTotal)} leads y {n0(cob.matsConDato)} de {n0(cob.matsTotal)} matrículas traen creativo identificable. La inversión por formato es del ciclo (Meta); leads y matrículas responden al período.
       </p>
     </>
   )
@@ -413,6 +438,12 @@ function Linea({ k, v, info }) {
 }
 
 const limpiar = (nombre) => String(nombre).replace(/^(Master|Diplomado|GMP|DIPLOMADO)\s*[-–]\s*/i, '').trim()
+function fmtCampInfo(f) {
+  if (f === 'Formulario nativo') return 'Campañas con formulario instantáneo dentro de Meta.'
+  if (f === 'Click to Web') return 'Campañas que llevan a una landing / sitio web.'
+  if (f === 'Search') return 'Campañas de búsqueda.'
+  return 'Otras campañas sin formato identificable.'
+}
 function mesLabel(yyyymm) {
   try { const s = new Date(yyyymm + '-01T00:00:00').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1) } catch { return yyyymm }
 }

@@ -24,6 +24,19 @@ async function get(ruta, params = {}) {
   return j.data || j
 }
 
+// Meta del CICLO COMPLETO: el endpoint devuelve un mes por llamada (es enorme), así que
+// recorremos enero..mes-actual del año y concatenamos. Habilita las series anuales de
+// pauta (inversión/CPL semanal, programa×semana). El snapshot sólo guarda agregados.
+async function getMetaAnual(c) {
+  const Y = now.getFullYear()
+  const out = []
+  for (let mes = 1; mes <= now.getMonth() + 1; mes++) {
+    try { const r = await get(`/meta/${c}`, { anio: Y, mes }); if (Array.isArray(r)) out.push(...r) }
+    catch (e) { console.warn(`     · meta ${Y}-${String(mes).padStart(2, '0')} no disponible (${e.message})`) }
+  }
+  return out
+}
+
 // Matrículas resiliente: si la llamada completa falla (la API de NODS a veces
 // devuelve 500 cuando un mes tiene un registro roto), reintenta año por año y,
 // si un año falla, mes por mes; concatena lo que sí devuelve (dedup por `clave`).
@@ -52,12 +65,12 @@ for (const cfg of CUENTAS) {
   const c = cfg.cuenta
   console.log(`\n== ${cfg.nombre} (${c}) ==`)
   // matriculas y consulta_base: base COMPLETA (sin filtro) para totales exactos.
-  // meta: acotado al mes en curso (es enorme) → cubre la inversión reciente.
+  // meta: TODOS los meses del año (para las series anuales de pauta).
   const [matriculas, consultaBase, objetivos, meta] = await Promise.all([
     getMatriculas(c),
     get(`/consulta_base/${c}`),
     get(`/objetivos/${c}`),
-    get(`/meta/${c}`, { anio: now.getFullYear(), mes: now.getMonth() + 1 }).catch(() => []),
+    getMetaAnual(c).catch(() => []),
   ])
   console.log(`  matriculas=${matriculas.length} leads=${consultaBase.length} objetivos=${objetivos.length} meta=${meta.length}`)
   const model = aggregate({ matriculas, consultaBase, objetivos, meta }, cfg)
