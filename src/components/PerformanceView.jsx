@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { n0, pct, money, fechaCorta } from '../lib/format.js'
+import DailyChart from './DailyChart.jsx'
+import { Gauge, MatrizCreativos, Demografia } from './PerfCharts.jsx'
 
 // Peso comercial de un Máster/GMP en "unidades equivalentes" de diplomado.
 const PESO_PREMIUM = 2.5
@@ -107,7 +109,13 @@ export default function PerformanceView({ cuenta, data, onBack }) {
       <SegBlock seg={segPrem} row={prem} obj={obj.porSegmento?.[segPrem.id]} detalle={detalleTodos} acc={acc} cuenta={cuenta} icon="🎓" tag={`valor ×${PESO_LABEL}`} periodView={periodView} />
       <SegBlock seg={segDip} row={dip} obj={obj.porSegmento?.[segDip.id]} detalle={detalleTodos} acc={mezcla(acc)} cuenta={cuenta} icon="📗" tag={`valor ×1`} periodView={periodView} />
 
-      {/* ===== Cumplimiento de objetivos ===== */}
+      {/* ===== Seguimiento semanal ===== */}
+      <div className="section-title">Seguimiento semanal
+        <Info>Evolución semana a semana del ciclo. Barras = neto de la semana; línea = acumulado; punteada = objetivo acumulado.<span className="src">CRM (leads/matrículas) + objetivos NODS</span></Info>
+      </div>
+      <DailyChart data={data} cfg={cuenta} />
+
+      {/* ===== Cumplimiento de objetivos (dona) ===== */}
       <div className="section-title">Cumplimiento de objetivos
         <Info>Metas que NODS carga por semana y formato (Másters/GMP y Diplomados). Comparamos lo real acumulado del ciclo contra la meta total.<span className="src">Fuente: NODS · objetivos</span></Info>
       </div>
@@ -115,27 +123,33 @@ export default function PerformanceView({ cuenta, data, onBack }) {
         <div className="card">
           <div className="card-h"><h2>Matrículas vs meta</h2><span className="hint">ciclo completo</span></div>
           <div className="card-b">
-            {cuenta.segmentos.map((s) => {
-              const ps = obj.porSegmento?.[s.id]
-              const p = ps && ps.matMeta ? (ps.matReal / ps.matMeta) * 100 : null
-              return <Meter key={s.id} titulo={s.nombre} real={ps?.matReal} meta={ps?.matMeta} pct={p} acc={acc} />
-            })}
+            <div className="gaugegrid">
+              <Gauge titulo="Total" real={obj.matriculas?.real} meta={obj.matriculas?.meta} acc={acc} />
+              {cuenta.segmentos.map((s) => { const ps = obj.porSegmento?.[s.id]; return <Gauge key={s.id} titulo={s.nombre} real={ps?.matReal} meta={ps?.matMeta} acc={acc} /> })}
+            </div>
           </div>
         </div>
         <div className="card">
           <div className="card-h"><h2>Leads vs meta</h2><span className="hint">ciclo completo</span></div>
           <div className="card-b">
-            {cuenta.segmentos.map((s) => {
-              const ps = obj.porSegmento?.[s.id]
-              const p = ps && ps.leadsMeta ? (ps.leadsReal / ps.leadsMeta) * 100 : null
-              return <Meter key={s.id} titulo={s.nombre} real={ps?.leadsReal} meta={ps?.leadsMeta} pct={p} acc={acc} />
-            })}
+            <div className="gaugegrid">
+              <Gauge titulo="Total" real={obj.leads?.real} meta={obj.leads?.meta} acc={acc} />
+              {cuenta.segmentos.map((s) => { const ps = obj.porSegmento?.[s.id]; return <Gauge key={s.id} titulo={s.nombre} real={ps?.leadsReal} meta={ps?.leadsMeta} acc={acc} /> })}
+            </div>
           </div>
         </div>
       </div>
 
       {/* ===== CREATIVOS → VENTAS (el cruce) ===== */}
       <CreativosBoard crea={crea} invCrea={invCrea} acc={acc} cuenta={cuenta} periodView={periodView} />
+
+      {/* ===== Demografía de la pauta ===== */}
+      {perf.demografia && <>
+        <div className="section-title">Rendimiento demográfico
+          <Info>Género y edad de las personas alcanzadas por la pauta, con su costo por lead. Del desglose demográfico de Meta Ads (mes en curso).<span className="src">Meta Ads · breakdown age_gender</span></Info>
+        </div>
+        <Demografia demo={perf.demografia} acc={acc} moneda={cuenta.moneda} />
+      </>}
 
       {/* ===== Detalle por programa (filtro) + drill ===== */}
       <div className="section-title">Detalle por programa {progSel && <span className="faint" style={{ textTransform: 'none', fontWeight: 400 }}>· {limpiar(progSel.nombre)}</span>}</div>
@@ -298,6 +312,16 @@ function CreativosBoard({ crea, invCrea, acc, cuenta, periodView }) {
           </div>
         </div>
       </div>
+
+      {/* Matriz ángulo × formato (celdas coloreadas por conversión) */}
+      {(crea.combos || []).length > 0 && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <div className="card-h"><h2>Matriz creativa · ángulo × formato</h2><span className="hint">matrículas por combinación</span></div>
+          <div className="card-b">
+            <MatrizCreativos combos={crea.combos} acc={acc} />
+          </div>
+        </div>
+      )}
 
       <p className="small faint" style={{ marginTop: 8 }}>
         Cobertura: {n0(cob.leadsConDato)} de {n0(cob.leadsTotal)} leads y {n0(cob.matsConDato)} de {n0(cob.matsTotal)} matrículas traen creativo identificable. La inversión por formato es del mes en curso (Meta); leads y matrículas responden al período.

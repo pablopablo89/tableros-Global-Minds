@@ -567,9 +567,11 @@ function construirMetas(objetivos, meta, mats, leads, cfg) {
       porSeg[seg].matMeta += Number(o.objetivo_matriculas) || 0
     }
   }
-  // Inversión: suma de amount_spent en meta (Meta Ads).
-  const inversion = meta.reduce((a, m) => a + (Number(m.amount_spent) || 0), 0)
-  const cobertura = meta.length ? rangoFechas(meta.map((m) => m.fecha)) : null
+  // Inversión: suma de amount_spent en meta (Meta Ads), sobre UNA sola descomposición
+  // (breakdown_type) para no multiplicar el gasto.
+  const metaBase = baseMeta(meta)
+  const inversion = metaBase.reduce((a, m) => a + (Number(m.amount_spent) || 0), 0)
+  const cobertura = metaBase.length ? rangoFechas(metaBase.map((m) => m.fecha)) : null
 
   // Ventana de inversión: leads/matrículas/ingreso DENTRO del período con gasto,
   // para que CPL/CAC/ROAS sean comparables (el gasto puede cubrir pocos días).
@@ -646,14 +648,25 @@ function fusionarDetalle(entries) {
   return out
 }
 
+// Meta Ads devuelve VARIAS descomposiciones de la MISMA campaña (breakdown_type:
+// platform/placement/age_gender/country/region). Cada una reparte el mismo gasto →
+// sumar todas multiplica la inversión. Para totales usamos UNA sola descomposición.
+function baseMeta(meta) {
+  const types = new Set(meta.map((r) => r.breakdown_type).filter(Boolean))
+  if (!types.size) return meta // data vieja sin breakdown → una sola copia
+  const bt = types.has('platform') ? 'platform' : [...types][0]
+  return meta.filter((r) => r.breakdown_type === bt)
+}
+
 // Performance de pauta desde `meta` (Meta Ads, granular): agrega inversión, alcance
 // (reach), impresiones, clics y leads de ads (global y por programa), y el cumplimiento
 // de objetivos de matrículas. La inversión cubre la ventana descargada (mes en curso).
 function construirPerformance(meta, metas) {
   const num = (v) => Number(v) || 0
+  const base = baseMeta(meta) // una sola descomposición para no multiplicar el gasto
   const ads = { inversion: 0, impresiones: 0, alcance: 0, clics: 0, leadsAds: 0 }
   const pmap = new Map()
-  for (const r of meta) {
+  for (const r of base) {
     ads.inversion += num(r.amount_spent)
     ads.impresiones += num(r.impresions)
     ads.alcance += num(r.reach)
@@ -675,7 +688,7 @@ function construirPerformance(meta, metas) {
   // cruce creativos→ventas del CRM. Cubre la ventana descargada de Meta (mes en curso).
   const invF = new Map(), invA = new Map()
   const acc = (map, k) => { if (!map.has(k)) map.set(k, { inversion: 0, leadsAds: 0 }); return map.get(k) }
-  for (const r of meta) {
+  for (const r of base) {
     if (!r.ad_name) continue
     const cr = parseCreativo(r.ad_name)
     const f = acc(invF, cr.formato); f.inversion += num(r.amount_spent); f.leadsAds += num(r.registration_completed)
@@ -683,6 +696,7 @@ function construirPerformance(meta, metas) {
   }
   const invRows = (map, campo) => [...map.entries()].map(([k, v]) => ({ [campo]: k, inversion: v.inversion, leadsAds: v.leadsAds, cpl: v.leadsAds ? v.inversion / v.leadsAds : null }))
 
+  const demografia = construirDemografia(meta)
   const v = metas.inversionVentana
   return {
     ads: {
@@ -694,8 +708,34 @@ function construirPerformance(meta, metas) {
     },
     adsPorPrograma,
     inversionCreativos: { porFormato: invRows(invF, 'formato'), porAngulo: invRows(invA, 'angulo'), ventana: metas.coberturaInversion },
+    demografia,
     objetivos: { matriculas: metas.matriculas, leads: metas.leads, porSegmento: metas.porSegmento },
   }
+}
+
+// Demografía de la pauta (género y edad) desde las filas breakdown_type='age_gender'
+// de Meta (cada fila trae age, gender, amount_spent, registration_completed). CPL por
+// grupo = gasto del grupo ÷ leads de ads del grupo. Ventana = mes en curso.
+function construirDemografia(meta) {
+  const num = (v) => Number(v) || 0
+  const rows = meta.filter((r) => r.breakdown_type === 'age_gender' && (r.gender || r.age))
+  if (!rows.length) return null
+  const GEN = { female: 'Mujeres', male: 'Hombres', unknown: 'Sin dato' }
+  const gMap = new Map(), aMap = new Map()
+  const bump = (map, k) => { if (!map.has(k)) map.set(k, { clave: k, inversion: 0, leadsAds: 0 }); return map.get(k) }
+  for (const r of rows) {
+    if (r.gender) { const g = bump(gMap, r.gender); g.inversion += num(r.amount_spent); g.leadsAds += num(r.registration_completed) }
+    if (r.age) { const a = bump(aMap, r.age); a.inversion += num(r.amount_spent); a.leadsAds += num(r.registration_completed) }
+  }
+  const fin = (map, campo, label) => [...map.values()].map((x) => ({ [campo]: label ? label(x.clave) : x.clave, inversion: x.inversion, leadsAds: x.leadsAds, cpl: x.leadsAds ? x.inversion / x.leadsAds : null }))
+  const genero = fin(gMap, 'genero', (k) => GEN[k] || k).sort((a, b) => b.leadsAds - a.leadsAds)
+  const ordenEdad = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
+  const edad = fin(aMap, 'edad').sort((a, b) => {
+    const ia = ordenEdad.indexOf(a.edad), ib = ordenEdad.indexOf(b.edad)
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+  })
+  const totLeads = genero.reduce((s, x) => s + x.leadsAds, 0)
+  return { genero: genero.map((x) => ({ ...x, share: totLeads ? (x.leadsAds / totLeads) * 100 : 0 })), edad, totalLeads: totLeads }
 }
 
 function lunes(d) { const x = new Date(d); x.setHours(0,0,0,0); const dow=(x.getDay()+6)%7; x.setDate(x.getDate()-dow); return x }
