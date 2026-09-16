@@ -357,6 +357,8 @@ function nucleo(leads, mats, cfg) {
     enGestion: leads.length - noUtiles, // "en gestión" del embudo = útiles
     potenciales: leads.filter((l) => esPotencial(l.sub)).length,
     potencialesRecientes: leads.filter((l) => esPotencial(l.sub) && esReciente(l.fecha)).length,
+    // Potenciales que se están cayendo: en proceso de pago pero "no contesta".
+    potencialesNoContesta: leads.filter((l) => l.sub === 'En proceso de pago - No contesta').length,
     matriculados: mats.length,
     notas: [],
   }
