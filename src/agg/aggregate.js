@@ -141,6 +141,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
       sub: norm(l.descripcion_sub),
       gestionado: norm(l.gestionado_neotel) === 'S',
       cohorte: cohorteLabel(l.descripcion_db),
+      baseId: parseInt(norm(l.base), 10), // id de base de NODS (ej. "5 - Diplomados 2026_1" → 5)
       ciudad: norm(l.ciudad),
       fecha: l.fecha_insercion || l.ts,
       macro: ch.macro, canal: ch.canal, fuente: fuenteLabel(l.utm_source, l.utm_medium),
@@ -348,6 +349,11 @@ function nucleo(leads, mats, cfg) {
   const DIEZ_DIAS = 10 * 864e5
   const esReciente = (f) => { if (!f) return false; const t = +new Date(f); return t >= ahora - DIEZ_DIAS && t <= ahora }
 
+  // Bases con el programa cerrado: sus potenciales NO cuentan (no van a convertir).
+  const cerradas = new Set(cfg.basesCerradas || [])
+  const esCerrado = (l) => cerradas.has(l.baseId)
+  const esPotencialAct = (l) => esPotencial(l.sub) && !esCerrado(l)
+
   const noUtiles = leads.filter((l) => esNoUtil(l.sub)).length
   const funnel = {
     leadsTotales: leads.length,
@@ -355,10 +361,10 @@ function nucleo(leads, mats, cfg) {
     utiles: leads.length - noUtiles, // en gestión = total − no útiles (embudo que resta)
     gestionadosFlag: leads.filter((l) => l.gestionado).length, // flag neotel (~99%), informativo
     enGestion: leads.length - noUtiles, // "en gestión" del embudo = útiles
-    potenciales: leads.filter((l) => esPotencial(l.sub)).length,
-    potencialesRecientes: leads.filter((l) => esPotencial(l.sub) && esReciente(l.fecha)).length,
+    potenciales: leads.filter((l) => esPotencialAct(l)).length,
+    potencialesRecientes: leads.filter((l) => esPotencialAct(l) && esReciente(l.fecha)).length,
     // Potenciales que se están cayendo: en proceso de pago pero "no contesta".
-    potencialesNoContesta: leads.filter((l) => l.sub === 'En proceso de pago - No contesta').length,
+    potencialesNoContesta: leads.filter((l) => l.sub === 'En proceso de pago - No contesta' && !esCerrado(l)).length,
     matriculados: mats.length,
     notas: [],
   }
@@ -370,7 +376,7 @@ function nucleo(leads, mats, cfg) {
     return {
       id: s.id, nombre: s.nombre, leads: ls.length, gestionados: gest,
       contactoPct: ls.length ? (cont / ls.length) * 100 : 0, // tasa de contacto real
-      potenciales: ls.filter((l) => esPotencial(l.sub)).length,
+      potenciales: ls.filter((l) => esPotencialAct(l)).length,
       matriculados: mats.filter((m) => m.seg === s.id).length,
     }
   })
@@ -386,7 +392,7 @@ function nucleo(leads, mats, cfg) {
     p.total++
     if (l.gestionado) p.gestionados++
     if (esNoUtil(l.sub)) p.noUtil++
-    if (esPotencial(l.sub)) p.potenciales++
+    if (esPotencialAct(l)) p.potenciales++
   }
   for (const m of mats) {
     if (!m.seg) continue
@@ -415,7 +421,7 @@ function nucleo(leads, mats, cfg) {
     p.total++
     if (l.gestionado) p.gestionados++
     if (esContactado(l.sub)) p.contacto++
-    if (esPotencial(l.sub)) p.potenciales++
+    if (esPotencialAct(l)) p.potenciales++
     if (esNoUtil(l.sub)) { p.noUtil++; p._mot.set(l.sub, (p._mot.get(l.sub) || 0) + 1) }
   }
   for (const m of mats) {

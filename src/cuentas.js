@@ -12,6 +12,9 @@ export const CUENTAS = [
     moneda: 'MXN',
     acento: '#E1743F',
     acentoSuave: '#FBEDE4',
+    // Bases (id de NODS) con el programa CERRADO: sus potenciales no cuentan (el
+    // programa reabre ~en un año). base 5 = "Diplomados 2026_1". Quitar al reabrir.
+    basesCerradas: [5],
     segmentos: [
       { id: 'mas', nombre: 'Másters', prefijo: 'Master' },
       { id: 'dip', nombre: 'Diplomados', prefijo: 'Diplomado' },
