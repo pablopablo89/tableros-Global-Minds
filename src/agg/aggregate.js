@@ -153,15 +153,21 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
   // ---------- Matrículas ----------
   const mats = matriculas.map((m) => {
     let src = m.source, med = m.medium, cont = m.content
-    if ((vacioCanal(src) && vacioCanal(med)) || vacioCanal(cont)) {
-      const hit = idxMail.get(nMail(m.correo)) || idxTel.get(nTel(m.telefono))
-      if (hit) {
-        if (vacioCanal(src) && vacioCanal(med)) { src = hit.utm_source; med = hit.utm_medium }
-        if (vacioCanal(cont)) cont = hit.utm_content
-      }
+    // Lead de origen (por email/teléfono): sirve para backfill de canal Y para la fecha
+    // de entrada del lead (maduración = días desde que entró el lead hasta el pago).
+    const hit = idxMail.get(nMail(m.correo)) || idxTel.get(nTel(m.telefono))
+    if (hit) {
+      if (vacioCanal(src) && vacioCanal(med)) { src = hit.utm_source; med = hit.utm_medium }
+      if (vacioCanal(cont)) cont = hit.utm_content
     }
     const ch = clasificarCanal(src, med)
     const cr = parseCreativo(cont)
+    const leadFecha = (hit && (hit.fecha_insercion || hit.ts)) || m.fecha_de_insercion
+    let maduracionDias = null
+    if (leadFecha && m.fecha_de_pago) {
+      const d = (+new Date(m.fecha_de_pago) - +new Date(leadFecha)) / 864e5
+      if (d >= 0 && d < 730) maduracionDias = d // acota basura (fechas mal cargadas)
+    }
     return {
       creaFormato: cr ? cr.formato : null, creaAngulo: cr ? cr.angulo : null,
       seg: segmentoDe(m.programa, cfg),
@@ -170,6 +176,7 @@ export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], 
       cohorte: cohorteLabel(m.cohorte),
       ciudad: norm(m.ciudad),
       fechaPago: m.fecha_de_pago,
+      maduracionDias,
       precio: money(m.precio_con_descuento) || money(m.precio_full),
       descuento: parseDescuento(m.descuento_aplicado),
       macro: ch.macro, canal: ch.canal, fuente: fuenteLabel(src, med),
@@ -412,7 +419,7 @@ function nucleo(leads, mats, cfg) {
   const detMap = new Map()
   const det = (seg, nombre) => {
     const k = `${seg}||${normKey(nombre)}`
-    if (!detMap.has(k)) detMap.set(k, { segmento: seg, nombre, total: 0, gestionados: 0, contacto: 0, potenciales: 0, noUtil: 0, matriculados: 0, descSum: 0, descN: 0, _mot: new Map() })
+    if (!detMap.has(k)) detMap.set(k, { segmento: seg, nombre, total: 0, gestionados: 0, contacto: 0, potenciales: 0, noUtil: 0, matriculados: 0, descSum: 0, descN: 0, madSum: 0, madN: 0, _mot: new Map() })
     return detMap.get(k)
   }
   for (const l of leads) {
@@ -429,6 +436,7 @@ function nucleo(leads, mats, cfg) {
     const p = det(m.seg, m.programa)
     p.matriculados++
     if (m.descuento != null) { p.descSum += m.descuento; p.descN++ }
+    if (m.maduracionDias != null) { p.madSum += m.maduracionDias; p.madN++ }
   }
   const programasDetalle = fusionarDetalle([...detMap.values()]).map((p) => ({
     segmento: p.segmento, nombre: p.nombre, key: normKey(p.nombre), total: p.total, gestionados: p.gestionados,
@@ -437,6 +445,8 @@ function nucleo(leads, mats, cfg) {
     convLead: p.total ? (p.matriculados / p.total) * 100 : 0,
     convContacto: p.contacto ? (p.matriculados / p.contacto) * 100 : 0,
     descuento: p.descN ? p.descSum / p.descN : null,
+    maduracion: p.madN ? p.madSum / p.madN : null, // días promedio lead → pago
+    maduracionN: p.madN,
     motivos: [...p._mot.entries()].map(([motivo, leads]) => ({ motivo, leads })).sort((a, b) => b.leads - a.leads).slice(0, 6),
   })).sort((a, b) => b.matriculados - a.matriculados || b.total - a.total)
 
@@ -709,6 +719,7 @@ function fusionarDetalle(entries) {
       dst.total += e.total; dst.gestionados += e.gestionados; dst.contacto += e.contacto
       dst.potenciales += e.potenciales; dst.noUtil += e.noUtil; dst.matriculados += e.matriculados
       dst.descSum += e.descSum; dst.descN += e.descN
+      dst.madSum += e.madSum; dst.madN += e.madN
       for (const [k, v] of e._mot) dst._mot.set(k, (dst._mot.get(k) || 0) + v)
     } else out.push(e)
   }

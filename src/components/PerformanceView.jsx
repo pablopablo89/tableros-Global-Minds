@@ -204,6 +204,7 @@ export default function PerformanceView({ cuenta, data, onBack }) {
               <Linea k="Matrículas" v={n0(progSel.matriculados)} info="Inscripciones pagadas del programa." />
               <Linea k="Conv. lead → matrícula" v={pct(progSel.convLead, 2)} info="Matrículas ÷ leads del programa." />
               <Linea k="Conv. contacto → matrícula" v={pct(progSel.convContacto, 2)} info="Matrículas ÷ leads contactados. Mide el cierre una vez que se logró el contacto." />
+              <Linea k="Maduración promedio" v={progSel.maduracion != null ? `${Math.round(progSel.maduracion)} días` : '—'} info="Días promedio desde que entró el lead hasta el pago efectivo (matrículas del período)." />
               <Linea k="Descuento promedio" v={progSel.descuento != null ? pct(progSel.descuento, 1) : '—'} info="Promedio del descuento aplicado en las matrículas del programa." />
             </div>
           </div>
@@ -245,6 +246,7 @@ function SegBlock({ seg, row, obj, detalle, acc, cuenta, icon, tag, periodView }
               <th>Potenc. <Info r>Leads en proceso de pago.<span className="src">NODS · descripcion_sub</span></Info></th>
               <th>Matrículas</th>
               <th>Conv. <Info r>Matrículas ÷ leads del programa.</Info></th>
+              <th>Maduración <Info r>Días promedio desde que entró el lead hasta el pago efectivo, sobre las matrículas del programa (las que pagaron en el período).<span className="src">matriculas.fecha_de_pago − fecha de entrada del lead</span></Info></th>
               <th>Descuento <Info r>Descuento promedio aplicado en las matrículas.<span className="src">NODS · matriculas.descuento_aplicado</span></Info></th>
               <th>Motivo #1 <Info r>Motivo de cierre no útil más frecuente.</Info></th>
             </tr></thead>
@@ -257,11 +259,12 @@ function SegBlock({ seg, row, obj, detalle, acc, cuenta, icon, tag, periodView }
                   <td>{n0(p.potenciales)}</td>
                   <td><b>{n0(p.matriculados)}</b></td>
                   <td>{pct(p.convLead, 1)}</td>
+                  <td>{p.maduracion != null ? `${Math.round(p.maduracion)} d` : '—'}</td>
                   <td>{p.descuento != null ? pct(p.descuento, 0) : '—'}</td>
                   <td>{p.motivos?.[0] ? `${p.motivos[0].motivo} (${n0(p.motivos[0].leads)})` : '—'}</td>
                 </tr>
               ))}
-              {!filas.length && <tr><td colSpan={8} className="faint">Sin datos en este período.</td></tr>}
+              {!filas.length && <tr><td colSpan={9} className="faint">Sin datos en este período.</td></tr>}
             </tbody>
           </table>
         </div>
