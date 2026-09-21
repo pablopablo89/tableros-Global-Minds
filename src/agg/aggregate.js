@@ -394,7 +394,7 @@ function nucleo(leads, mats, cfg) {
     if (!l.seg) continue
     const co = l.seg === 'dip' ? l.cohorte : null
     const k = keyP(l.seg, l.programa, co)
-    if (!progMap.has(k)) progMap.set(k, { segmento: l.seg, nombre: l.programa, cohorte: co, gestionados: 0, noUtil: 0, potenciales: 0, matriculados: 0, total: 0 })
+    if (!progMap.has(k)) progMap.set(k, { segmento: l.seg, nombre: l.programa, cohorte: co, gestionados: 0, noUtil: 0, potenciales: 0, matriculados: 0, total: 0, madSum: 0, madN: 0 })
     const p = progMap.get(k)
     p.total++
     if (l.gestionado) p.gestionados++
@@ -409,8 +409,10 @@ function nucleo(leads, mats, cfg) {
       const alt = [...progMap.keys()].find((kk) => kk.startsWith(`${m.seg}||${normKey(m.programa)}||`))
       if (alt) k = alt
     }
-    if (!progMap.has(k)) progMap.set(k, { segmento: m.seg, nombre: m.programa, cohorte: co, gestionados: 0, noUtil: 0, potenciales: 0, matriculados: 0, total: 0 })
-    progMap.get(k).matriculados++
+    if (!progMap.has(k)) progMap.set(k, { segmento: m.seg, nombre: m.programa, cohorte: co, gestionados: 0, noUtil: 0, potenciales: 0, matriculados: 0, total: 0, madSum: 0, madN: 0 })
+    const pe = progMap.get(k)
+    pe.matriculados++
+    if (m.maduracionDias != null) { pe.madSum += m.maduracionDias; pe.madN++ }
   }
   const programas = [...progMap.values()]
 

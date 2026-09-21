@@ -17,7 +17,8 @@ export default function ProgramTable({ titulo, filas, agruparCohorte = false, co
   const total = fs.reduce((a, f) => ({
     gestionados: a.gestionados + f.gestionados, noUtil: a.noUtil + f.noUtil,
     potenciales: a.potenciales + f.potenciales, matriculados: a.matriculados + f.matriculados, total: a.total + f.total,
-  }), { gestionados: 0, noUtil: 0, potenciales: 0, matriculados: 0, total: 0 })
+    madSum: a.madSum + (f.madSum || 0), madN: a.madN + (f.madN || 0),
+  }), { gestionados: 0, noUtil: 0, potenciales: 0, matriculados: 0, total: 0, madSum: 0, madN: 0 })
 
   const th = (campo, label) => (
     <th onClick={() => setOrden((o) => ({ campo, dir: o.campo === campo ? -o.dir : -1 }))} style={{ cursor: 'pointer' }}>
@@ -42,6 +43,7 @@ export default function ProgramTable({ titulo, filas, agruparCohorte = false, co
                 {th('potenciales', 'Potenciales')}
                 {th('matriculados', 'Matriculados')}
                 {th('total', 'Total')}
+                <th title="Días promedio desde que entró el lead hasta el pago efectivo">Maduración</th>
               </tr>
             </thead>
             <tbody>
@@ -55,6 +57,7 @@ export default function ProgramTable({ titulo, filas, agruparCohorte = false, co
                 <td>{n0(total.potenciales)}</td>
                 <td>{n0(total.matriculados)}</td>
                 <td>{n0(total.total)}</td>
+                <td>{madLabel(total)}</td>
               </tr>
             </tbody>
           </table>
@@ -75,6 +78,7 @@ function FragmentGroup({ g, mostrarCohorte }) {
           <td>{n0(g.subtotal.potenciales)}</td>
           <td>{n0(g.subtotal.matriculados)}</td>
           <td>{n0(g.subtotal.total)}</td>
+          <td>{madLabel(g.subtotal)}</td>
         </tr>
       )}
       {g.filas.map((f, i) => (
@@ -85,8 +89,14 @@ function FragmentGroup({ g, mostrarCohorte }) {
           <td>{n0(f.potenciales)}</td>
           <td>{n0(f.matriculados)}</td>
           <td>{n0(f.total)}</td>
+          <td>{madLabel(f)}</td>
         </tr>
       ))}
     </>
   )
+}
+
+// Maduración promedio (días) a partir de la suma/conteo acumulados. "—" si no hay dato.
+function madLabel(x) {
+  return x && x.madN ? `${Math.round(x.madSum / x.madN)} d` : '—'
 }

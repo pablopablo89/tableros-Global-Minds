@@ -30,8 +30,10 @@ export function subtotalDe(filas) {
       potenciales: a.potenciales + f.potenciales,
       matriculados: a.matriculados + f.matriculados,
       total: a.total + f.total,
+      madSum: a.madSum + (f.madSum || 0),
+      madN: a.madN + (f.madN || 0),
     }),
-    { gestionados: 0, noUtil: 0, potenciales: 0, matriculados: 0, total: 0 },
+    { gestionados: 0, noUtil: 0, potenciales: 0, matriculados: 0, total: 0, madSum: 0, madN: 0 },
   )
 }
 
@@ -91,6 +93,7 @@ export function consolidarProgramas(filas) {
       const a = mapa.get(k)
       a.gestionados += f.gestionados; a.noUtil += f.noUtil
       a.potenciales += f.potenciales; a.matriculados += f.matriculados; a.total += f.total
+      a.madSum = (a.madSum || 0) + (f.madSum || 0); a.madN = (a.madN || 0) + (f.madN || 0)
     }
   }
   // paso 2: fusión difusa (el de mayor total conserva el nombre)
@@ -101,6 +104,7 @@ export function consolidarProgramas(filas) {
     if (dst) {
       dst.r.gestionados += it.r.gestionados; dst.r.noUtil += it.r.noUtil
       dst.r.potenciales += it.r.potenciales; dst.r.matriculados += it.r.matriculados; dst.r.total += it.r.total
+      dst.r.madSum = (dst.r.madSum || 0) + (it.r.madSum || 0); dst.r.madN = (dst.r.madN || 0) + (it.r.madN || 0)
     } else out.push({ r: { ...it.r }, k: it.k })
   }
   return out.map((o) => o.r).sort((a, b) => b.matriculados - a.matriculados)
