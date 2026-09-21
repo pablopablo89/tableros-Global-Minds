@@ -14,6 +14,11 @@ const KEY = process.env.NODS_API_KEY
 if (!KEY) { console.warn('NODS_API_KEY ausente → uso snapshots existentes (sin refrescar).'); process.exit(0) }
 
 const now = new Date()
+// META_FULL=1 (sólo en el GitHub Action diario, con 4GB) → baja TODOS los meses de Meta
+// para las series anuales. En el build de Vercel / botón "Actualizar" NO se activa: el
+// refresco es liviano (CRM fresco + Meta del mes) y se conservan las series anuales del
+// último snapshot, así el deploy es rápido y no se cae con la descarga pesada de Meta.
+const META_FULL = process.env.META_FULL === '1'
 
 async function get(ruta, params = {}) {
   const url = new URL(BASE + ruta)
@@ -65,22 +70,30 @@ for (const cfg of CUENTAS) {
   const c = cfg.cuenta
   console.log(`\n== ${cfg.nombre} (${c}) ==`)
   // matriculas y consulta_base: base COMPLETA (sin filtro) para totales exactos.
-  // meta: TODOS los meses del año (para las series anuales de pauta).
+  // meta: TODO el año sólo con META_FULL (Action); si no, sólo el mes (build liviano).
   const [matriculas, consultaBase, objetivos, meta] = await Promise.all([
     getMatriculas(c),
     get(`/consulta_base/${c}`),
     get(`/objetivos/${c}`),
-    getMetaAnual(c).catch(() => []),
+    (META_FULL ? getMetaAnual(c) : get(`/meta/${c}`, { anio: now.getFullYear(), mes: now.getMonth() + 1 })).catch(() => []),
   ])
   console.log(`  matriculas=${matriculas.length} leads=${consultaBase.length} objetivos=${objetivos.length} meta=${meta.length}`)
   const model = aggregate({ matriculas, consultaBase, objetivos, meta }, cfg)
   model.actualizado = now.toISOString()
   const outPath = path.join(outDir, `${cfg.id}.json`)
+  let prev = null
+  try { prev = JSON.parse(fs.readFileSync(outPath, 'utf8')) } catch {}
+  // Build liviano (sin META_FULL): conservo las SERIES ANUALES de pauta del snapshot
+  // previo (las genera el Action diario), para no encogerlas al mes en curso.
+  if (!META_FULL && prev?.performance?.serie?.length) {
+    const p = model.performance, q = prev.performance
+    p.serie = q.serie; p.programaSemana = q.programaSemana; p.formatoCampana = q.formatoCampana
+    p.ads = q.ads; p.demografia = q.demografia; p.inversionCreativos = q.inversionCreativos
+    if (prev.metas) model.metas = prev.metas
+  }
   // Guardia anti-regresión: si las matrículas obtenidas caen respecto al snapshot
   // anterior (típico cuando la API no puede servir el mes en curso), NO piso los
   // datos buenos — dejo el snapshot previo y se auto-recupera cuando la API sane.
-  let prev = null
-  try { prev = JSON.parse(fs.readFileSync(outPath, 'utf8')) } catch {}
   if (prev && model.cobertura.matriculas < (prev.cobertura?.matriculas || 0) * 0.98) {
     console.warn(`  ⚠ matrículas bajarían de ${prev.cobertura.matriculas} a ${model.cobertura.matriculas} (la API no sirve el mes en curso) → mantengo snapshot anterior`)
   } else {

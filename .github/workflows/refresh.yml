@@ -25,6 +25,7 @@ jobs:
       - name: Regenerar snapshots desde la API de NODS
         env:
           NODS_API_KEY: ${{ secrets.NODS_API_KEY }}
+          META_FULL: '1'   # baja todos los meses de Meta (series anuales de pauta)
           NODE_OPTIONS: --max-old-space-size=4096
         run: node scripts/refresh-live.mjs
 
