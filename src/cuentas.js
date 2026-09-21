@@ -34,6 +34,24 @@ export const CUENTAS = [
       { id: 'dip', nombre: 'Diplomados', prefijo: 'DIPLOMADO' },
     ],
   },
+  {
+    id: 'uniandes',
+    nombre: 'Uniandes',
+    subtitulo: 'Universidad de los Andes · Colombia',
+    cuenta: 'uniandes',
+    pais: 'Colombia',
+    moneda: 'COP',
+    acento: '#B7791F',
+    acentoSuave: '#F6ECD6',
+    // Uniandes no tiene split Máster/Diplomado (tipo_programa vacío) → un solo segmento
+    // con todos los programas (prefijo '' matchea cualquiera).
+    segmentos: [
+      { id: 'prog', nombre: 'Programas', prefijo: '' },
+    ],
+    // Sólo la cohorte NUEVA: matrículas con cohorte 2026-02, y leads de todas las bases
+    // ACTIVAS (excluye las cohortes viejas 2026-1 [208,209] y la base "Programa cerrado" [2]).
+    cohorteActiva: { matricula: '2026-02', leadBaseIdsExcluir: [208, 209, 2], label: 'Cohorte 2026-2' },
+  },
 ]
 
 export const ETAPAS_FUNNEL = [

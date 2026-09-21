@@ -116,6 +116,14 @@ function cohorteLabel(raw) {
 }
 
 export function aggregate({ matriculas = [], consultaBase = [], objetivos = [], meta = [] }, cfg) {
+  // Cohorte activa: algunas cuentas (Uniandes) sólo miran la cohorte nueva → filtramos
+  // matrículas por su `cohorte` y leads por el id de base ("211 - Cohorte 2026_2").
+  if (cfg.cohorteActiva) {
+    const ca = cfg.cohorteActiva
+    if (ca.matricula) matriculas = matriculas.filter((m) => norm(m.cohorte) === ca.matricula)
+    if (ca.leadBaseIds) consultaBase = consultaBase.filter((l) => ca.leadBaseIds.includes(parseInt(norm(l.base), 10)))
+    if (ca.leadBaseIdsExcluir) consultaBase = consultaBase.filter((l) => !ca.leadBaseIdsExcluir.includes(parseInt(norm(l.base), 10)))
+  }
   const segIds = cfg.segmentos.map((s) => s.id)
   const idxSeg = (id) => cfg.segmentos.find((s) => s.id === id)
 

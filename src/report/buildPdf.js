@@ -29,7 +29,7 @@ export async function generarPdf(data, cfg, seleccion, periodo = null) {
   if (inc('portada')) await portada(ctx)
   if (inc('funnel')) slideFunnel(ctx)
   if (inc('prog_principal')) slidePrograma(ctx, `Detalle por programa — ${segPrincipal(cfg).nombre}`, consolidarProgramas(programasDe(data, segPrincipal(cfg).id)))
-  if (inc('prog_diplomados')) slidePrograma(ctx, 'Detalle por programa — Diplomados', consolidarProgramas(programasDe(data, segDiplomados(cfg).id)).filter((p) => p.total >= 3))
+  if (inc('prog_diplomados') && segDiplomados(cfg)) slidePrograma(ctx, `Detalle por programa — ${segDiplomados(cfg).nombre}`, consolidarProgramas(programasDe(data, segDiplomados(cfg).id)).filter((p) => p.total >= 3))
   if (inc('ciudad')) slideCiudad(ctx)
   if (inc('motivos')) slideMotivos(ctx)
   if (inc('objetivos')) slideObjetivos(ctx)

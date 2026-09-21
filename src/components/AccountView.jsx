@@ -126,7 +126,7 @@ export default function AccountView({ cuenta }) {
         </div>
         <div className="spacer" />
         <button className="btn" onClick={() => setVista('organico')} disabled={!data} title="Alcance orgánico: adquisición sin pauta" style={{ borderColor: '#2E9E6B', color: '#227A52' }}>🌱 Alcance orgánico</button>
-        <button className="btn" onClick={() => setVista('performance')} disabled={!data} title="Performance: tipo de programa, objetivos y creativos que venden" style={{ borderColor: cuenta.acento, color: cuenta.acento }}>📊 Performance</button>
+        {cuenta.segmentos.length >= 2 && <button className="btn" onClick={() => setVista('performance')} disabled={!data} title="Performance: tipo de programa, objetivos y creativos que venden" style={{ borderColor: cuenta.acento, color: cuenta.acento }}>📊 Performance</button>}
         <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)">{refrescando ? '⏳ Actualizando…' : '⟳ Actualizar datos'}</button>
         <button className="btn primary" onClick={() => setShowReport(true)} disabled={!data}>Generar reporte</button>
       </div>
@@ -222,7 +222,7 @@ export default function AccountView({ cuenta }) {
           <div className="section-title">Detalle por programa</div>
           <div className="grid" style={{ gridTemplateColumns: '1fr' }}>
             <ProgramTable titulo={segPrincipal(cuenta).nombre} filas={consolidarProgramas(programasDe(dataVista, segPrincipal(cuenta).id))} />
-            <ProgramTable titulo="Diplomados" filas={consolidarProgramas(programasDe(dataVista, segDiplomados(cuenta).id)).filter((p) => p.total >= 3)} />
+            {segDiplomados(cuenta) && <ProgramTable titulo={segDiplomados(cuenta).nombre} filas={consolidarProgramas(programasDe(dataVista, segDiplomados(cuenta).id)).filter((p) => p.total >= 3)} />}
           </div>
 
           <div className="section-title">Geografía</div>
