@@ -67,6 +67,21 @@ body { background: var(--surface-2); }
 
 .main { max-width: 1280px; margin: 0 auto; padding: 24px; }
 
+/* ---------- Selector de cuenta (desplegable discreto) ---------- */
+.acctsw { margin-left: auto; position: relative; }
+.acctsw-btn { display: inline-flex; align-items: center; gap: 9px; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; box-shadow: var(--shadow); transition: border-color .15s ease, box-shadow .15s ease; }
+.acctsw-btn:hover { border-color: var(--acc); box-shadow: 0 4px 14px rgba(16,17,22,.08); }
+.acctsw-btn .dot, .acctsw-item .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dot); flex: none; }
+.acctsw-btn .chev { color: var(--faint); transition: transform .18s ease; }
+.acctsw-btn .chev.up { transform: rotate(180deg); }
+.acctsw-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; min-width: 210px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 34px rgba(16,17,22,.16); padding: 6px; animation: swpop .14s ease; }
+@keyframes swpop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.acctsw-item { display: flex; align-items: center; gap: 9px; width: 100%; font: inherit; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; background: transparent; border: 0; border-radius: 9px; padding: 9px 11px; text-align: left; }
+.acctsw-item:hover { background: var(--surface-2); }
+.acctsw-item.sel { font-weight: 700; }
+.acctsw-item .nm { flex: 1; }
+.acctsw-item .tick { color: var(--acc); font-weight: 700; }
+
 /* ---------- Encabezado de cuenta ---------- */
 .acct-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
 .acct-head h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.5px; }
@@ -93,11 +108,15 @@ body { background: var(--surface-2); }
 .section-title { font-size: 13px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); margin: 28px 0 12px; }
 
 /* ---------- KPIs ---------- */
-.kpi { padding: 16px 18px; }
-.kpi .lbl { font-size: 12px; color: var(--muted); font-weight: 500; }
-.kpi .val { font-size: 30px; font-weight: 700; letter-spacing: -1px; margin-top: 4px; }
+.kpi { padding: 16px 18px 16px 20px; position: relative; overflow: hidden; transition: transform .18s ease, box-shadow .18s ease; }
+.kpi::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--acc); border-radius: 0 3px 3px 0; opacity: .85; }
+.kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(16,17,22,.10); }
+.kpi .lbl { font-size: 12px; color: var(--muted); font-weight: 500; display: flex; align-items: center; }
+.kpi .val { font-size: 30px; font-weight: 700; letter-spacing: -1px; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .kpi .val.small { font-size: 22px; }
 .kpi .delta { font-size: 12px; margin-top: 4px; font-weight: 500; }
+/* números tabulares en tarjetas/medidores para que el conteo no “salte” de ancho */
+.mini .m .mv, .segblk .mv, .meter .m-top, table.data td, table.matriz td { font-variant-numeric: tabular-nums; }
 .up { color: var(--up); } .down { color: var(--down); } .warn { color: var(--warn); }
 
 /* ---------- Funnel ---------- */

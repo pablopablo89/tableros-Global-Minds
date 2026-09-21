@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { n0, pct, money, fechaCorta } from '../lib/format.js'
 import DailyChart from './DailyChart.jsx'
 import { Gauge, MatrizCreativos, Demografia, MetaSerie, ProgramaSemana } from './PerfCharts.jsx'
+import CountUp from './CountUp.jsx'
 
 // Peso comercial de un Máster/GMP en "unidades equivalentes" de diplomado.
 const PESO_PREMIUM = 2.5
@@ -82,12 +83,12 @@ export default function PerformanceView({ cuenta, data, onBack }) {
 
       {/* ===== KPIs de cabecera ===== */}
       <div className="grid cols-6">
-        <Kpi lbl="Leads" val={n0(f.leadsTotales)} info={<>Leads cargados en el CRM (consulta_base) dentro del período elegido.<span className="src">Fuente: NODS · consulta_base</span></>} />
-        <Kpi lbl="Matrículas" val={n0(f.matriculados)} info={<>Inscripciones pagadas en el período.<span className="src">Fuente: NODS · matriculas</span></>} />
-        <Kpi lbl="Conversión" val={pct(convGlobal, 2)} info={<>Matrículas ÷ leads del período. Cuántos de cada 100 leads terminan matriculados.<span className="src">Cálculo: matrículas / leads</span></>} />
-        <Kpi lbl="Inversión Meta" val={money(ads.inversion, cuenta.moneda)} info={<>Gasto total en Meta Ads del ciclo. Una sola descomposición de Meta (no multiplica el gasto). No cambia con el filtro de período.<span className="src">Fuente: Meta Ads · amount_spent</span></>} />
-        <Kpi lbl="CPL global" val={ads.cpl != null ? money(ads.cpl, cuenta.moneda) : '—'} info={<>Costo por lead de pauta: inversión ÷ leads reportados por Meta (registration_completed) del ciclo.<span className="src">Cálculo: inversión / leads de ads</span></>} />
-        <Kpi lbl="Alcance" val={ads.alcance ? n0(ads.alcance) : '—'} sub={ads.impresiones ? `${n0(ads.impresiones)} impresiones` : null} info={<>Personas alcanzadas por la pauta (con solapamiento entre plataformas).<span className="src">Fuente: Meta Ads · reach</span></>} />
+        <Kpi lbl="Leads" val={<CountUp value={f.leadsTotales} format={n0} />} info={<>Leads cargados en el CRM (consulta_base) dentro del período elegido.<span className="src">Fuente: NODS · consulta_base</span></>} />
+        <Kpi lbl="Matrículas" val={<CountUp value={f.matriculados} format={n0} />} info={<>Inscripciones pagadas en el período.<span className="src">Fuente: NODS · matriculas</span></>} />
+        <Kpi lbl="Conversión" val={<CountUp value={convGlobal} format={(v) => pct(v, 2)} />} info={<>Matrículas ÷ leads del período. Cuántos de cada 100 leads terminan matriculados.<span className="src">Cálculo: matrículas / leads</span></>} />
+        <Kpi lbl="Inversión Meta" val={<CountUp value={ads.inversion || 0} format={(v) => money(v, cuenta.moneda)} />} info={<>Gasto total en Meta Ads del ciclo. Una sola descomposición de Meta (no multiplica el gasto). No cambia con el filtro de período.<span className="src">Fuente: Meta Ads · amount_spent</span></>} />
+        <Kpi lbl="CPL global" val={ads.cpl != null ? <CountUp value={ads.cpl} format={(v) => money(v, cuenta.moneda)} /> : '—'} info={<>Costo por lead de pauta: inversión ÷ leads reportados por Meta (registration_completed) del ciclo.<span className="src">Cálculo: inversión / leads de ads</span></>} />
+        <Kpi lbl="Alcance" val={ads.alcance ? <CountUp value={ads.alcance} format={n0} /> : '—'} sub={ads.impresiones ? `${n0(ads.impresiones)} impresiones` : null} info={<>Personas alcanzadas por la pauta (con solapamiento entre plataformas).<span className="src">Fuente: Meta Ads · reach</span></>} />
       </div>
       <p className="small faint" style={{ marginTop: 8 }}>
         Inversión, CPL, alcance e impresiones vienen de Meta Ads y cubren {ads.ventana ? <>el ciclo <b>{fechaCorta(ads.ventana.desde)}–{fechaCorta(ads.ventana.hasta)}</b></> : 'todo el ciclo'}; no se mueven con el filtro de período. Leads, matrículas y conversión sí responden al período.

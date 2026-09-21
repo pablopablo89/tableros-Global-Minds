@@ -17,6 +17,7 @@ import DailyChart from './DailyChart.jsx'
 import ReportModal from '../report/ReportModal.jsx'
 import OrganicView from './OrganicView.jsx'
 import PerformanceView from './PerformanceView.jsx'
+import CountUp from './CountUp.jsx'
 
 export default function AccountView({ cuenta }) {
   const [filtros, setFiltros] = useState({})
@@ -171,11 +172,11 @@ export default function AccountView({ cuenta }) {
 
           {/* KPIs */}
           <div className="grid cols-5">
-            <Kpi lbl="Leads totales" val={n0(dataVista.funnel.leadsTotales)} />
-            <Kpi lbl="En gestión" val={n0(dataVista.funnel.utiles != null ? dataVista.funnel.utiles : dataVista.funnel.leadsTotales - dataVista.funnel.noUtiles)} sub="leads − no útiles" />
-            <Kpi lbl="Potenciales" val={n0(dataVista.funnel.potenciales)} sub={dataVista.funnel.potencialesNoContesta != null ? <>no contesta: <b>{n0(dataVista.funnel.potencialesNoContesta)}</b></> : null} />
-            <Kpi lbl="Matriculados" val={n0(dataVista.funnel.matriculados)} />
-            <Kpi lbl="Tasa de conversión" val={pct(dataVista.funnel.leadsTotales ? (dataVista.funnel.matriculados / dataVista.funnel.leadsTotales) * 100 : 0, 2)} sub="lead → matrícula" />
+            <Kpi lbl="Leads totales" val={<CountUp value={dataVista.funnel.leadsTotales} format={n0} />} />
+            <Kpi lbl="En gestión" val={<CountUp value={dataVista.funnel.utiles != null ? dataVista.funnel.utiles : dataVista.funnel.leadsTotales - dataVista.funnel.noUtiles} format={n0} />} sub="leads − no útiles" />
+            <Kpi lbl="Potenciales" val={<CountUp value={dataVista.funnel.potenciales} format={n0} />} sub={dataVista.funnel.potencialesNoContesta != null ? <>no contesta: <b>{n0(dataVista.funnel.potencialesNoContesta)}</b></> : null} />
+            <Kpi lbl="Matriculados" val={<CountUp value={dataVista.funnel.matriculados} format={n0} />} />
+            <Kpi lbl="Tasa de conversión" val={<CountUp value={dataVista.funnel.leadsTotales ? (dataVista.funnel.matriculados / dataVista.funnel.leadsTotales) * 100 : 0} format={(v) => pct(v, 2)} />} sub="lead → matrícula" />
           </div>
 
           {data.ventasMes && (
