@@ -52,7 +52,11 @@ body { background: var(--surface-2); }
   background:
     radial-gradient(1000px 440px at 88% -80px, var(--acc-soft) 0%, transparent 62%),
     linear-gradient(180deg, #FBFCFE 0%, var(--surface-2) 260px);
+  /* degradado del acento reutilizable (el acento vive en .app vía estilo inline) */
+  --acc-grad: linear-gradient(180deg, var(--acc) 0%, color-mix(in srgb, var(--acc) 42%, #ffffff) 100%);
+  --acc-grad-h: linear-gradient(90deg, var(--acc) 0%, color-mix(in srgb, var(--acc) 42%, #ffffff) 100%);
 }
+@supports not (background: color-mix(in srgb, red, blue)) { .app { --acc-grad: var(--acc); --acc-grad-h: var(--acc); } }
 .topbar {
   position: sticky; top: 0; z-index: 20;
   background: rgba(255,255,255,.72); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px);
@@ -140,7 +144,7 @@ body { background: var(--surface-2); }
 
 .segcards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .segcard { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.segcard .sc-h { background: var(--acc); color: #fff; padding: 8px 14px; font-weight: 600; font-size: 14px; }
+.segcard .sc-h { background: var(--acc-grad-h); color: #fff; padding: 9px 14px; font-weight: 600; font-size: 14px; }
 .segcard .sc-row { display: flex; justify-content: space-between; padding: 9px 14px; border-top: 1px solid var(--line); font-size: 13px; }
 .segcard .sc-row .k { color: var(--muted); }
 .segcard .sc-row .v { font-weight: 600; }
@@ -150,7 +154,7 @@ body { background: var(--surface-2); }
 .meter .m-top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
 .meter .m-top .k { color: var(--muted); }
 .meter .track { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
-.meter .fill { height: 100%; background: var(--acc); border-radius: 999px; }
+.meter .fill { height: 100%; background: var(--acc-grad-h); border-radius: 999px; transition: width .9s cubic-bezier(.22,.61,.36,1); }
 .meter .m-sub { font-size: 11px; color: var(--faint); margin-top: 4px; }
 
 /* ---------- Tablas ---------- */
@@ -162,6 +166,8 @@ table.data thead th:last-child { border-top-right-radius: 8px; }
 table.data td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
 table.data td:first-child { text-align: left; white-space: normal; color: var(--ink); }
 table.data tbody tr:nth-child(even) { background: var(--surface-2); }
+table.data tbody tr:hover { background: var(--acc-soft); }
+table.data thead th { background: var(--acc-grad-h); }
 table.data tr.total td { font-weight: 700; background: var(--ink); color: #fff; border: none; }
 table.data tr.total td:first-child { border-bottom-left-radius: 8px; }
 table.data tr.total td:last-child { border-bottom-right-radius: 8px; }
@@ -171,7 +177,7 @@ table.data tr.cohorte-h td { background: var(--acc-soft); color: var(--acc); fon
 .citybars { display: flex; flex-direction: column; gap: 6px; }
 .citybars .row { display: grid; grid-template-columns: 150px 1fr 44px; align-items: center; gap: 10px; font-size: 12px; }
 .citybars .row .name { color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.citybars .row .bar { height: 14px; background: var(--acc); border-radius: 4px; min-width: 2px; }
+.citybars .row .bar { height: 14px; background: var(--acc-grad-h); border-radius: 5px; min-width: 2px; box-shadow: 0 1px 3px -1px color-mix(in srgb, var(--acc) 55%, transparent); transition: width .8s cubic-bezier(.22,.61,.36,1); }
 .citybars .row .num { font-weight: 600; }
 
 /* ---------- Insights ---------- */

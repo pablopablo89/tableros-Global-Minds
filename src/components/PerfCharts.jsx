@@ -122,6 +122,12 @@ export function Demografia({ demo, acc, moneda }) {
         <div className="card-b">
           <div className="table-wrap">
             <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%' }} role="img" aria-label="Leads y CPL por edad">
+              <defs>
+                <linearGradient id="edadBar" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor={acc} stopOpacity="0.95" />
+                  <stop offset="1" stopColor={acc} stopOpacity="0.5" />
+                </linearGradient>
+              </defs>
               {[0, 0.5, 1].map((fr, i) => {
                 const v = Math.round(maxE * fr)
                 return <g key={i}><line x1={padL} x2={W - padR} y1={yBar(v)} y2={yBar(v)} stroke="var(--line)" /><text x={padL - 5} y={yBar(v) + 3} textAnchor="end" fontSize="9" fill="var(--faint)">{n0(v)}</text></g>
@@ -130,7 +136,7 @@ export function Demografia({ demo, acc, moneda }) {
                 const h = (H - padB) - yBar(e.leadsAds)
                 return (
                   <g key={e.edad}>
-                    <rect x={xC(i) - bw * 0.28} y={yBar(e.leadsAds)} width={bw * 0.56} height={Math.max(0, h)} rx="3" fill={acc} opacity="0.85" />
+                    <rect x={xC(i) - bw * 0.28} y={yBar(e.leadsAds)} width={bw * 0.56} height={Math.max(0, h)} rx="4" fill="url(#edadBar)" />
                     <text x={xC(i)} y={yBar(e.leadsAds) - 4} textAnchor="middle" fontSize="9" fill="var(--muted)">{n0(e.leadsAds)}</text>
                     <text x={xC(i)} y={H - 26} textAnchor="middle" fontSize="9" fill="var(--faint)">{e.edad}</text>
                     {e.cpl != null && <circle cx={xC(i)} cy={yCpl(e.cpl)} r="3.5" fill="var(--ink)" />}
@@ -159,6 +165,8 @@ export function MetaSerie({ serie, acc, moneda }) {
   const yInv = (v) => (H - padB) - (v / invMax) * (H - padT - padB)
   const yCpl = (v) => (H - padB) - (v / cplMax) * (H - padT - padB)
   const lin = s.map((p, i) => `${i ? 'L' : 'M'}${xC(i).toFixed(1)},${yCpl(p.cpl || 0).toFixed(1)}`).join(' ')
+  const baseY = H - padB
+  const areaCpl = `${lin} L${xC(s.length - 1).toFixed(1)},${baseY} L${xC(0).toFixed(1)},${baseY} Z`
   const step = Math.max(1, Math.ceil(s.length / 10))
   const totInv = s.reduce((a, x) => a + x.inversion, 0)
   const totLeads = s.reduce((a, x) => a + x.leadsAds, 0)
@@ -167,10 +175,21 @@ export function MetaSerie({ serie, acc, moneda }) {
       <div className="card-h"><h2>Inversión y CPL por semana</h2><span className="hint">{money(totInv, moneda)} · {n0(totLeads)} leads · CPL {money(totLeads ? totInv / totLeads : 0, moneda)}</span></div>
       <div className="card-b"><div className="table-wrap">
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%' }} role="img" aria-label="Inversión y CPL por semana">
+          <defs>
+            <linearGradient id="msBar" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={acc} stopOpacity="0.92" />
+              <stop offset="1" stopColor={acc} stopOpacity="0.42" />
+            </linearGradient>
+            <linearGradient id="msArea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="var(--ink)" stopOpacity="0.12" />
+              <stop offset="1" stopColor="var(--ink)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
           {[0, 0.5, 1].map((fr, i) => { const v = invMax * fr; return <g key={i}><line x1={padL} x2={W - padR} y1={yInv(v)} y2={yInv(v)} stroke="var(--line)" /><text x={padL - 6} y={yInv(v) + 3} textAnchor="end" fontSize="8.5" fill="var(--faint)">{money(v, moneda)}</text></g> })}
           {[0, cplMax].map((v, i) => <text key={'c' + i} x={W - padR + 6} y={yCpl(v) + 3} fontSize="8.5" fill="var(--ink)">{money(v, moneda)}</text>)}
-          {s.map((p, i) => { const h = (H - padB) - yInv(p.inversion); return <rect key={i} x={xC(i) - bw * 0.32} y={yInv(p.inversion)} width={bw * 0.64} height={Math.max(0, h)} rx="2" fill={acc} opacity="0.8" /> })}
-          <path d={lin} fill="none" stroke="var(--ink)" strokeWidth="2" />
+          <path d={areaCpl} fill="url(#msArea)" />
+          {s.map((p, i) => { const h = (H - padB) - yInv(p.inversion); return <rect key={i} x={xC(i) - bw * 0.32} y={yInv(p.inversion)} width={bw * 0.64} height={Math.max(0, h)} rx="3.5" fill="url(#msBar)" /> })}
+          <path d={lin} fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
           {s.map((p, i) => p.cpl != null ? <circle key={'d' + i} cx={xC(i)} cy={yCpl(p.cpl)} r="2.6" fill="var(--ink)" /> : null)}
           {s.map((p, i) => (i % step === 0 ? <text key={'x' + i} x={xC(i)} y={H - 22} textAnchor="middle" fontSize="8" fill="var(--faint)">{fechaCorta(p.semana)}</text> : null))}
           <text x={padL} y={H - 6} fontSize="8" fill="var(--faint)">barras: inversión (izq) · línea: CPL (der)</text>

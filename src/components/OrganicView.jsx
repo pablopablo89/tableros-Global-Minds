@@ -275,7 +275,7 @@ export default function OrganicView({ cuenta, data, onBack }) {
                   <div className="small" style={{ fontWeight: 700, color: 'var(--acc)' }}>{m.matriculados || ''}</div>
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 100 }}>
                     <div title={`${m.leads} leads`} style={{ width: 12, height: `${(m.leads / mesLeadMax) * 100}%`, background: 'var(--line)', borderRadius: '3px 3px 0 0', minHeight: 2 }} />
-                    <div title={`${m.matriculados} matrículas`} style={{ width: 12, height: `${(m.matriculados / mesMatMax) * 100}%`, background: 'var(--acc)', borderRadius: '3px 3px 0 0', minHeight: m.matriculados ? 3 : 0 }} />
+                    <div title={`${m.matriculados} matrículas`} style={{ width: 12, height: `${(m.matriculados / mesMatMax) * 100}%`, background: 'var(--acc-grad)', borderRadius: '4px 4px 0 0', minHeight: m.matriculados ? 3 : 0 }} />
                   </div>
                   <div className="small faint">{mesCorto(m.mes)}</div>
                 </div>
@@ -302,7 +302,7 @@ function LeadsPorMes({ serie }) {
           {serie.map((m) => (
             <div key={m.mes} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, height: '100%', justifyContent: 'flex-end' }}>
               <div className="small" style={{ fontWeight: 700, color: 'var(--acc)' }}>{n0(m.leads)}</div>
-              <div title={`${m.leads} leads`} style={{ width: '70%', maxWidth: 42, height: `${Math.max((m.leads / max) * 100, 2)}%`, background: 'var(--acc)', borderRadius: '4px 4px 0 0', minHeight: 3 }} />
+              <div title={`${m.leads} leads`} style={{ width: '70%', maxWidth: 42, height: `${Math.max((m.leads / max) * 100, 2)}%`, background: 'var(--acc-grad)', borderRadius: '5px 5px 0 0', minHeight: 3, boxShadow: '0 2px 8px -3px color-mix(in srgb, var(--acc) 60%, transparent)' }} />
               <div className="small faint">{mesCorto(m.mes)}</div>
             </div>
           ))}
