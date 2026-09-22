@@ -18,6 +18,9 @@ function WeeklyChart({ titulo, serie, color }) {
   const hayObj = serie.some((p) => p.objetivoAcum > 0)
   const linO = hayObj ? serie.map((p, i) => `${i ? 'L' : 'M'}${xC(i).toFixed(1)},${yA(p.objetivoAcum).toFixed(1)}`).join(' ') : null
   const ultimo = serie[serie.length - 1]
+  const gid = 'wk-' + String(titulo).replace(/[^a-z0-9]/gi, '')
+  const baseY = H - padB
+  const areaA = `${linA} L${xC(serie.length - 1).toFixed(1)},${baseY} L${xC(0).toFixed(1)},${baseY} Z`
 
   const step = Math.max(1, Math.ceil(serie.length / 8))
   const mostrarNeto = bw > 16
@@ -31,23 +34,35 @@ function WeeklyChart({ titulo, serie, color }) {
       <div className="card-b">
         <div className="table-wrap">
           <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: '100%' }} role="img">
+            <defs>
+              <linearGradient id={gid + '-bar'} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={color} stopOpacity="0.95" />
+                <stop offset="1" stopColor={color} stopOpacity="0.5" />
+              </linearGradient>
+              <linearGradient id={gid + '-area'} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={color} stopOpacity="0.16" />
+                <stop offset="1" stopColor={color} stopOpacity="0" />
+              </linearGradient>
+            </defs>
             {/* eje neto (izq) */}
             {[0, 0.5, 1].map((fr, i) => {
               const v = Math.round(nMax * fr)
               return <g key={'n' + i}><line x1={padL} x2={W - padR} y1={yN(v)} y2={yN(v)} stroke="var(--line)" strokeWidth="1" /><text x={padL - 6} y={yN(v) + 3} textAnchor="end" fontSize="9" fill="var(--faint)">{n0(v)}</text></g>
             })}
+            {/* área bajo el acumulado */}
+            <path d={areaA} fill={`url(#${gid}-area)`} />
             {/* barras neto */}
             {serie.map((p, i) => {
               const h = (H - padB) - yN(p.neto)
               return (
                 <g key={i}>
-                  <rect x={xC(i) - bw * 0.3} y={yN(p.neto)} width={bw * 0.6} height={Math.max(0, h)} fill={color} opacity="0.85" rx="2" />
+                  <rect x={xC(i) - bw * 0.3} y={yN(p.neto)} width={bw * 0.6} height={Math.max(0, h)} fill={`url(#${gid}-bar)`} rx="3.5" />
                   {mostrarNeto && p.neto > 0 && <text x={xC(i)} y={yN(p.neto) - 3} textAnchor="middle" fontSize="8" fill="var(--muted)">{n0(p.neto)}</text>}
                 </g>
               )
             })}
             {/* línea acumulado */}
-            <path d={linA} fill="none" stroke="var(--ink)" strokeWidth="2" />
+            <path d={linA} fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
             <text x={W - padR + 4} y={yA(ultimo.acumulado) + 3} fontSize="9" fill="var(--ink)">{n0(ultimo.acumulado)}</text>
             {linO && <><path d={linO} fill="none" stroke="var(--down, #C0544B)" strokeWidth="1.5" strokeDasharray="5 4" /><text x={W - padR + 4} y={yA(ultimo.objetivoAcum) + 3} fontSize="9" fill="var(--down, #C0544B)">obj</text></>}
             {/* eje X semanas */}
