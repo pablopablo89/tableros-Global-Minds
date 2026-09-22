@@ -21,19 +21,25 @@ const NO_UTIL = new Set([
   'Pide no ser llamado',
   'No acepta por duración del programa',
 ])
+// Comparación de tipificaciones INSENSIBLE A ACENTOS: la data de Colombia (Uniandes)
+// viene sin tildes ("Telefono erroneo", "informacion") y no matcheaba las listas con tildes.
+const _tip = (s) => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
+const NO_UTIL_N = new Set([...NO_UTIL].map(_tip))
 // Motivo si está en NO_UTIL o empieza con "Busca " (maestría/posgrado/pregrado/curso corto).
-const esNoUtilSub = (sub) => NO_UTIL.has(sub) || /^busca /i.test(sub || '')
+const esNoUtilSub = (sub) => NO_UTIL_N.has(_tip(sub)) || /^busca /i.test(sub || '')
 
 // Tasa de CONTACTO: se cuentan como NO contactados sólo los estados donde nunca
-// se llegó a hablar con la persona. El resto (respondió, dio info, declinó, etc.)
-// cuenta como contacto. Coincide con el flag "contactado" del catálogo de NODS (~40-45%).
+// se llegó a hablar con la persona (incluye la plantilla de bienvenida automática de
+// WhatsApp, que no es contacto real). El resto (respondió, dio info, declinó, etc.) cuenta.
 const NO_CONTACTO = new Set([
   'No contesta', 'Buzon de voz', 'Volver a llamar', 'Teléfono erróneo o fuera de servicio',
   'Cierre de lead por no contacto', 'Duplicado', 'Imposible contactar', 'NotProcessed',
   'TimeoutCategorization', 'NoAnswerDialer', 'RejectedDialer', 'CongestionDialer',
   'AnswerRingingDialer', 'AnswerQueueDialer', 'WithoutPhones', 'Agenda telefonica',
+  'Plantilla Bienvenida Wpp',
 ])
-const esContactado = (sub) => !!sub && !NO_CONTACTO.has(sub)
+const NO_CONTACTO_N = new Set([...NO_CONTACTO].map(_tip))
+const esContactado = (sub) => !!sub && !NO_CONTACTO_N.has(_tip(sub))
 // Tipificaciones "potencial" (en proceso de pago).
 const POTENCIAL = new Set(['En proceso de pago', 'En proceso de pago - No contesta'])
 

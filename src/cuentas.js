@@ -48,9 +48,9 @@ export const CUENTAS = [
     segmentos: [
       { id: 'prog', nombre: 'Programas', prefijo: '' },
     ],
-    // Sólo la cohorte NUEVA: matrículas con cohorte 2026-02, y leads de todas las bases
-    // ACTIVAS (excluye las cohortes viejas 2026-1 [208,209] y la base "Programa cerrado" [2]).
-    cohorteActiva: { matricula: '2026-02', leadBaseIdsExcluir: [208, 209, 2], label: 'Cohorte 2026-2' },
+    // Sólo la cohorte NUEVA (2026-2): matrículas con cohorte 2026-02 y leads de la base
+    // "Cohorte 2026-3" (id 212), que es la base de captación de esta cohorte en NODS.
+    cohorteActiva: { matricula: '2026-02', leadBaseIds: [212], label: 'Cohorte 2026-2' },
   },
 ]
 
