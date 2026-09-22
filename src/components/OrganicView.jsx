@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { n0, pct, fechaCorta } from '../lib/format.js'
 import { MACRO_COLOR, MACRO_DESC } from '../lib/canales.js'
 import { consolidarProgramas } from '../lib/derive.js'
+import Icon from './Icon.jsx'
 
 // Página "Alcance orgánico": entiende el canal de adquisición con foco en lo
 // GANADO sin pauta. Pensada como un mercadólogo: eficiencia por canal, de dónde
@@ -316,8 +317,8 @@ function BackBar({ cuenta, onBack }) {
   return (
     <div className="acct-head">
       <div>
-        <button className="btn" onClick={onBack} style={{ marginBottom: 10 }}>← Volver al tablero</button>
-        <h1>🌱 Alcance orgánico</h1>
+        <button className="btn" onClick={onBack} style={{ marginBottom: 10 }}><Icon name="arrowLeft" /> Volver al tablero</button>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Icon name="leaf" size={24} strokeWidth={2} style={{ color: '#2E9E6B' }} /> Alcance orgánico</h1>
         <div className="sub">{cuenta.nombre} · adquisición sin pauta</div>
       </div>
     </div>

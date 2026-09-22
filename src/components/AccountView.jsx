@@ -18,6 +18,7 @@ import ReportModal from '../report/ReportModal.jsx'
 import OrganicView from './OrganicView.jsx'
 import PerformanceView from './PerformanceView.jsx'
 import CountUp from './CountUp.jsx'
+import Icon from './Icon.jsx'
 
 export default function AccountView({ cuenta }) {
   const [filtros, setFiltros] = useState({})
@@ -125,10 +126,10 @@ export default function AccountView({ cuenta }) {
           </select>
         </div>
         <div className="spacer" />
-        <button className="btn" onClick={() => setVista('organico')} disabled={!data} title="Alcance orgánico: adquisición sin pauta" style={{ borderColor: '#2E9E6B', color: '#227A52' }}>🌱 Alcance orgánico</button>
-        {cuenta.segmentos.length >= 2 && <button className="btn" onClick={() => setVista('performance')} disabled={!data} title="Performance: tipo de programa, objetivos y creativos que venden" style={{ borderColor: cuenta.acento, color: cuenta.acento }}>📊 Performance</button>}
-        <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)">{refrescando ? '⏳ Actualizando…' : '⟳ Actualizar datos'}</button>
-        <button className="btn primary" onClick={() => setShowReport(true)} disabled={!data}>Generar reporte</button>
+        <button className="btn" onClick={() => setVista('organico')} disabled={!data} title="Alcance orgánico: adquisición sin pauta" style={{ borderColor: '#2E9E6B', color: '#227A52' }}><Icon name="leaf" /> Alcance orgánico</button>
+        {cuenta.segmentos.length >= 2 && <button className="btn" onClick={() => setVista('performance')} disabled={!data} title="Performance: tipo de programa, objetivos y creativos que venden" style={{ borderColor: cuenta.acento, color: cuenta.acento }}><Icon name="chart" /> Performance</button>}
+        <button className="btn" onClick={actualizarDatos} disabled={refrescando} title="Trae datos nuevos de NODS (~2 min)"><Icon name="refresh" style={refrescando ? { animation: 'spin 1s linear infinite' } : undefined} /> {refrescando ? 'Actualizando…' : 'Actualizar datos'}</button>
+        <button className="btn primary" onClick={() => setShowReport(true)} disabled={!data}><Icon name="report" /> Generar reporte</button>
       </div>
       {msgRefresco && (
         <div className="card" style={{ marginBottom: 16, ...bannerStyle(msgTipo) }}>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { REQUIRE_PASSWORD } from '../config.js'
+import Icon from '../components/Icon.jsx'
 
 // Gate de contraseña a nivel app. La clave se guarda en sessionStorage y se
 // reenvía al proxy (/api/nods) como x-app-key. En modo seed no valida contra red;
@@ -33,6 +34,7 @@ export default function Gate({ children }) {
     <div className="gate">
       <form className="box" onSubmit={entrar}>
         <div className="grad" />
+        <div className="gate-badge"><Icon name="lock" size={22} strokeWidth={1.9} /></div>
         <h1>Tablero de Reportes</h1>
         <p>NODS · en alianza con +a educação</p>
         <input

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { SECCIONES, generarPptx } from './buildPptx.js'
 import { generarPdf } from './buildPdf.js'
+import Icon from '../components/Icon.jsx'
 
 export default function ReportModal({ data, cfg, periodo, onClose }) {
   // La lámina de objetivos es sólo del ciclo completo: se oculta al filtrar por período.
@@ -28,10 +29,14 @@ export default function ReportModal({ data, cfg, periodo, onClose }) {
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="m-h">Generar reporte — {cfg.nombre}</div>
+        <div className="m-h">
+          <span className="m-ic"><Icon name="report" size={17} /></span>
+          Generar reporte — {cfg.nombre}
+          <button className="m-x" onClick={onClose} aria-label="Cerrar"><Icon name="x" size={16} /></button>
+        </div>
         <div className="m-b">
           {periodo
-            ? <p className="small" style={{ marginTop: 0, padding: '8px 10px', background: cfg.acentoSuave, borderRadius: 8 }}>📅 Reporte del período: <b>{periodo.label}</b>. Los datos salen de ese corte. La lámina de objetivos (sólo del ciclo) no se incluye.</p>
+            ? <p className="small" style={{ marginTop: 0, padding: '9px 11px', background: cfg.acentoSuave, borderRadius: 10 }}>Reporte del período: <b>{periodo.label}</b>. Los datos salen de ese corte. La lámina de objetivos (sólo del ciclo) no se incluye.</p>
             : <p className="small muted" style={{ marginTop: 0 }}>Elegí formato y qué láminas incluir. Las base replican tu presentación; las opcionales suman información del tablero.</p>}
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -55,7 +60,7 @@ export default function ReportModal({ data, cfg, periodo, onClose }) {
         <div className="m-f">
           <button className="btn" onClick={onClose} disabled={gen}>Cancelar</button>
           <button className="btn primary" onClick={descargar} disabled={gen || !sel.length}>
-            {gen ? 'Generando…' : `Descargar .${formato}`}
+            <Icon name="download" style={gen ? { animation: 'spin 1s linear infinite' } : undefined} /> {gen ? 'Generando…' : `Descargar .${formato}`}
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { n0, pct, money, fechaCorta } from '../lib/format.js'
 import DailyChart from './DailyChart.jsx'
 import { Gauge, MatrizCreativos, Demografia, MetaSerie, ProgramaSemana } from './PerfCharts.jsx'
 import CountUp from './CountUp.jsx'
+import Icon from './Icon.jsx'
 
 // Peso comercial de un Máster/GMP en "unidades equivalentes" de diplomado.
 const PESO_PREMIUM = 2.5
@@ -395,8 +396,8 @@ function BackBar({ cuenta, onBack }) {
   return (
     <div className="acct-head">
       <div>
-        <button className="btn" onClick={onBack} style={{ marginBottom: 10 }}>← Volver al tablero</button>
-        <h1>📊 Performance</h1>
+        <button className="btn" onClick={onBack} style={{ marginBottom: 10 }}><Icon name="arrowLeft" /> Volver al tablero</button>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Icon name="chart" size={24} strokeWidth={2} style={{ color: cuenta.acento }} /> Performance</h1>
         <div className="sub">{cuenta.nombre} · rendimiento por tipo, programa y creativo</div>
       </div>
     </div>

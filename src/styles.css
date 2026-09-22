@@ -203,24 +203,36 @@ table.data tr.cohorte-h td { background: var(--acc-soft); color: var(--acc); fon
 .btn.primary:hover { filter: brightness(1.05); }
 .btn:disabled { opacity: .55; cursor: default; }
 
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn svg { opacity: .9; }
 .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
 .toolbar .spacer { flex: 1; }
 .field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); }
 .field select, .field input { font: inherit; font-size: 13px; color: var(--ink); border: 1px solid var(--line); border-radius: 9px; padding: 7px 10px; background: var(--surface); }
 
 /* ---------- Gate ---------- */
-.gate { min-height: 100vh; display: grid; place-items: center; background: var(--surface-2); }
-.gate .box { width: 340px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 26px; text-align: center; }
-.gate .grad { height: 4px; background: var(--grad); border-radius: 999px; margin-bottom: 20px; }
-.gate h1 { font-size: 18px; margin: 0 0 4px; }
-.gate p { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
-.gate input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; margin-bottom: 10px; }
+.gate { min-height: 100vh; display: grid; place-items: center; padding: 20px;
+  background:
+    radial-gradient(700px 380px at 20% -10%, #EAF0FF 0%, transparent 60%),
+    radial-gradient(700px 380px at 90% 110%, #F5E9FB 0%, transparent 60%),
+    linear-gradient(180deg, #FBFCFE, var(--surface-2)); }
+.gate .box { width: 372px; max-width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: 30px 30px 26px; text-align: center; }
+.gate .grad { height: 4px; background: var(--grad); border-radius: 999px; margin: 0 0 22px; }
+.gate .gate-badge { width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 16px; display: grid; place-items: center; color: #fff; background: var(--grad-soft); box-shadow: 0 10px 24px -8px rgba(25,70,227,.5); }
+.gate h1 { font-size: 20px; font-weight: 700; letter-spacing: -.3px; margin: 0 0 5px; }
+.gate p { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+.gate input { width: 100%; padding: 12px 13px; border: 1px solid var(--line); border-radius: 12px; font: inherit; margin-bottom: 11px; transition: border-color .15s ease, box-shadow .15s ease; }
+.gate input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(25,70,227,.14); }
+.gate .box .btn.primary { background: var(--blue); border-color: var(--blue); }
 .gate .err { color: var(--down); font-size: 12px; margin-bottom: 10px; }
 
 /* ---------- Modal reporte ---------- */
-.modal-bg { position: fixed; inset: 0; background: rgba(14,17,22,.4); display: grid; place-items: center; z-index: 50; padding: 20px; }
-.modal { width: 480px; max-width: 100%; max-height: 90vh; overflow: auto; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); }
-.modal .m-h { padding: 18px 20px; border-bottom: 1px solid var(--line); font-weight: 600; }
+.modal-bg { position: fixed; inset: 0; background: rgba(14,17,22,.44); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); display: grid; place-items: center; z-index: 50; padding: 20px; animation: swpop .16s ease; }
+.modal { width: 480px; max-width: 100%; max-height: 90vh; overflow: auto; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+.modal .m-h { display: flex; align-items: center; gap: 10px; padding: 17px 20px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 15px; letter-spacing: -.2px; }
+.modal .m-h .m-x { margin-left: auto; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.modal .m-h .m-x:hover { background: var(--surface-2); color: var(--ink); }
+.modal .m-h .m-ic { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; color: #fff; background: var(--grad-soft); }
 .modal .m-b { padding: 18px 20px; }
 .modal .m-f { padding: 16px 20px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: flex-end; }
 .check { display: flex; gap: 10px; align-items: center; padding: 8px 0; font-size: 14px; cursor: pointer; }
