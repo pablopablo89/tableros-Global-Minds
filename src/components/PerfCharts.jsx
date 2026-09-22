@@ -14,8 +14,8 @@ export function Gauge({ titulo, real, meta, acc }) {
   return (
     <div style={{ textAlign: 'center' }}>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxWidth: 220 }} role="img" aria-label={titulo}>
-        <path d={arc(x0, y0, xb, yb, 1)} fill="none" stroke="var(--surface-2)" strokeWidth={sw} strokeLinecap="round" />
-        {frac > 0 && <path d={arc(x0, y0, x1, y1, frac > 0.5 ? 1 : 0)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />}
+        <path d={arc(x0, y0, xb, yb, 0)} fill="none" stroke="var(--surface-2)" strokeWidth={sw} strokeLinecap="round" />
+        {frac > 0 && <path d={arc(x0, y0, x1, y1, 0)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />}
         <text x={cx} y={cy - 20} textAnchor="middle" fontSize="30" fontWeight="700" fill="var(--ink)">{p == null ? '—' : `${Math.round(p)}%`}</text>
         <text x={cx} y={cy - 2} textAnchor="middle" fontSize="11" fill="var(--faint)">{n0(real)}{meta != null ? ` / ${n0(meta)}` : ''}</text>
       </svg>
