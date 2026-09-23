@@ -171,13 +171,12 @@ export default function AccountView({ cuenta }) {
             </div>
           )}
 
-          {/* KPIs */}
-          <div className="grid cols-5">
+          {/* KPIs (la tasa de conversión vive en la pestaña Performance) */}
+          <div className="grid cols-4">
             <Kpi lbl="Leads totales" val={<CountUp value={dataVista.funnel.leadsTotales} format={n0} />} />
             <Kpi lbl="En gestión" val={<CountUp value={dataVista.funnel.utiles != null ? dataVista.funnel.utiles : dataVista.funnel.leadsTotales - dataVista.funnel.noUtiles} format={n0} />} sub="leads − no útiles" />
             <Kpi lbl="Potenciales" val={<CountUp value={dataVista.funnel.potenciales} format={n0} />} sub={dataVista.funnel.potencialesNoContesta != null ? <>no contesta: <b>{n0(dataVista.funnel.potencialesNoContesta)}</b></> : null} />
             <Kpi lbl="Matriculados" val={<CountUp value={dataVista.funnel.matriculados} format={n0} />} />
-            <Kpi lbl="Tasa de conversión" val={<CountUp value={dataVista.funnel.leadsTotales ? (dataVista.funnel.matriculados / dataVista.funnel.leadsTotales) * 100 : 0} format={(v) => pct(v, 2)} />} sub="lead → matrícula" />
           </div>
 
           {data.ventasMes && (
