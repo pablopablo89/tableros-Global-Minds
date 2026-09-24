@@ -3,7 +3,12 @@ name: Refrescar datos NODS
 # Corre todos los días (y se puede disparar a mano desde la pestaña Actions).
 on:
   schedule:
-    - cron: '0 10 * * *'   # 10:00 UTC = 07:00 Buenos Aires
+    # 08:35 UTC = 05:35 Buenos Aires. Se corre a un minuto "raro" (NO :00) a
+    # propósito: el minuto en punto es el más congestionado de GitHub Actions y
+    # sus corridas quedan encoladas y demoradas 3-6 h. Con un minuto raro el
+    # disparo es casi puntual; el adelanto (~1.5 h antes de las 7 am) es colchón
+    # por si aún queda algo de demora, así los datos están listos a las 7 am AR.
+    - cron: '35 8 * * *'
   workflow_dispatch: {}      # botón "Run workflow" manual
 
 permissions:
